@@ -1,0 +1,19 @@
+# requirements.txt
+
+torch
+torchvision
+timm
+opencv-python
+mediapipe
+Flask
+tqdm
+scikit-learn
+numpy
+seaborn
+matplotlib
+psutil
+pandas
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
