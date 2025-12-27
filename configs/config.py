@@ -50,9 +50,101 @@ VAL_SPLIT = 0.1
 # ==============================================================================
 # --- 3. CẤU HÌNH HUẤN LUYỆN (TRAINING CONFIGURATION) ---
 # ==============================================================================
-# Tự động phát hiện GPU trên máy của bạn
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_NAME = 'efficientnet_b4'
+
+# ==============================================================================
+# --- TỰ ĐỘNG CHỌN DEVICE (GPU/CPU) DỰA TRÊN HIỆU NĂNG ---
+# ==============================================================================
+def benchmark_device(device: str, num_iterations: int = 10) -> float:
+    """
+    Benchmark hiệu năng của device (GPU hoặc CPU).
+    Returns: Thời gian trung bình (giây) cho mỗi iteration.
+    """
+    import time
+    import torch.nn as nn
+    
+    # Tạo một model nhỏ để test
+    test_model = nn.Sequential(
+        nn.Conv2d(3, 64, 3, padding=1),
+        nn.ReLU(),
+        nn.AdaptiveAvgPool2d(1),
+        nn.Flatten(),
+        nn.Linear(64, 2)
+    ).to(device)
+    
+    # Tạo dummy input
+    dummy_input = torch.randn(1, 3, 224, 224).to(device)
+    
+    # Warmup
+    for _ in range(3):
+        _ = test_model(dummy_input)
+    
+    # Benchmark
+    if device == "cuda":
+        torch.cuda.synchronize()
+    
+    start_time = time.time()
+    for _ in range(num_iterations):
+        _ = test_model(dummy_input)
+    
+    if device == "cuda":
+        torch.cuda.synchronize()
+    
+    elapsed_time = time.time() - start_time
+    return elapsed_time / num_iterations
+
+def auto_select_device() -> str:
+    """
+    Tự động chọn device tốt hơn (GPU hoặc CPU) dựa trên benchmark.
+    Returns: "cuda" hoặc "cpu"
+    """
+    cuda_available = torch.cuda.is_available()
+    
+    if not cuda_available:
+        print("ℹ️  GPU không khả dụng, sử dụng CPU")
+        return "cpu"
+    
+    # Lấy thông tin GPU
+    gpu_name = torch.cuda.get_device_name(0)
+    gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+    
+    print(f"🔍 Đang benchmark để chọn device tốt nhất...")
+    print(f"   GPU: {gpu_name} ({gpu_memory:.1f}GB VRAM)")
+    
+    try:
+        # Benchmark GPU
+        print("   ⏱️  Đang test GPU...")
+        gpu_time = benchmark_device("cuda", num_iterations=20)
+        print(f"   ✅ GPU: {gpu_time*1000:.2f}ms/iteration")
+        
+        # Benchmark CPU
+        print("   ⏱️  Đang test CPU...")
+        cpu_time = benchmark_device("cpu", num_iterations=20)
+        print(f"   ✅ CPU: {cpu_time*1000:.2f}ms/iteration")
+        
+        # So sánh và chọn device nhanh hơn
+        if gpu_time < cpu_time:
+            speedup = cpu_time / gpu_time
+            print(f"   🎯 GPU nhanh hơn {speedup:.2f}x → Chọn GPU")
+            return "cuda"
+        else:
+            speedup = gpu_time / cpu_time
+            print(f"   🎯 CPU nhanh hơn {speedup:.2f}x → Chọn CPU")
+            print(f"   ⚠️  GPU có thể yếu hoặc có vấn đề, sử dụng CPU sẽ tốt hơn")
+            return "cpu"
+            
+    except Exception as e:
+        print(f"   ⚠️  Lỗi khi benchmark: {e}")
+        print(f"   ℹ️  Mặc định sử dụng GPU (nếu có)")
+        return "cuda" if cuda_available else "cpu"
+
+# Tự động chọn device tốt nhất
+DEVICE = auto_select_device()
+print(f"\n✅ Đã chọn device: {DEVICE.upper()}")
+if DEVICE == "cuda":
+    print(f"   GPU: {torch.cuda.get_device_name(0)}")
+    print(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.1f}GB")
+print("=" * 60)
 
 # --- TỐI ƯU TRIỆT ĐỂ CHO GPU MX130 (2GB VRAM) ---
 IMAGE_SIZE = (224, 224)  # Giữ nguyên để tương thích với checkpoint
@@ -72,8 +164,8 @@ else:
     PIN_MEMORY = False
     MIXED_PRECISION = False
 
-LEARNING_RATE = 0.001  # Tăng lại vì batch size lớn hơn
-WEIGHT_DECAY = 1e-4  # L2 regularization để giảm overfitting
+LEARNING_RATE = 0.0005  # Giảm từ 0.001 để học ổn định hơn, tránh model "nhảy" quá xa
+WEIGHT_DECAY = 1e-5  # Giảm từ 1e-4 để tránh regularization quá mạnh (đồng bộ với config_colab)
 
 # Gradient accumulation - KHÔNG CẦN vì batch size đã đủ lớn
 ACCUMULATION_STEPS = 1  # Tắt accumulation để tăng tốc độ
