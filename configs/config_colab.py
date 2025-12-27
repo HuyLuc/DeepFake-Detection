@@ -107,6 +107,7 @@ else:
     MIXED_PRECISION = False
 
 LEARNING_RATE = 0.001
+WEIGHT_DECAY = 1e-4  # L2 regularization để giảm overfitting
 ACCUMULATION_STEPS = 1
 
 # ==============================================================================

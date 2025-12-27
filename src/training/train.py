@@ -232,7 +232,10 @@ def run_training():
     model = timm.create_model(config.MODEL_NAME, pretrained=True, num_classes=len(train_dataset.classes))
     model = model.to(config.DEVICE)
     
-    optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
+    # Thêm weight_decay để giảm overfitting (L2 regularization)
+    weight_decay = getattr(config, 'WEIGHT_DECAY', 1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE, weight_decay=weight_decay)
+    print(f"Weight decay (L2 regularization): {weight_decay}")
     
     # --- THÊM MỚI: Mixed Precision Scaler (TẮT để tránh NaN) ---
     use_mixed_precision = getattr(config, 'MIXED_PRECISION', True) and config.DEVICE == 'cuda'
@@ -256,7 +259,9 @@ def run_training():
         print("Không áp dụng trọng số lớp.")
     # ----------------------------------------------
     
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
+    # Learning rate scheduler: giảm LR khi validation accuracy không cải thiện
+    # Patience=3: đợi 3 epochs không cải thiện thì giảm LR xuống 10%
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3, verbose=True)
 
     # --- 3. Tải Checkpoint (nếu có) và Backup ---
     checkpoint_path = os.path.join(config.MODEL_SAVE_DIR, 'checkpoint.pth.tar')
@@ -273,9 +278,10 @@ def run_training():
     print(f"📊 Tiếp tục training từ epoch {start_epoch}, best val acc: {best_val_acc:.4f}")
 
     # --- THÊM MỚI: Early Stopping ---
-    early_stopping_patience = 7
+    # Giảm patience từ 7 xuống 4 để dừng sớm hơn khi overfitting
+    early_stopping_patience = 4
     early_stopping_counter = 0
-    print(f"Early stopping patience: {early_stopping_patience} epochs")
+    print(f"Early stopping patience: {early_stopping_patience} epochs (đã tối ưu để tránh overfitting)")
 
     # --- 4. Vòng lặp Huấn luyện và Kiểm định ---
     print("\n--- Bắt đầu vòng lặp huấn luyện ---")

@@ -73,6 +73,7 @@ else:
     MIXED_PRECISION = False
 
 LEARNING_RATE = 0.001  # Tăng lại vì batch size lớn hơn
+WEIGHT_DECAY = 1e-4  # L2 regularization để giảm overfitting
 
 # Gradient accumulation - KHÔNG CẦN vì batch size đã đủ lớn
 ACCUMULATION_STEPS = 1  # Tắt accumulation để tăng tốc độ
