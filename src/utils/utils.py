@@ -22,6 +22,9 @@ def save_checkpoint(
     os.makedirs(model_save_dir, exist_ok=True)
     checkpoint_path = os.path.join(model_save_dir, filename)
     torch.save(state, checkpoint_path)
+    
+    # Định nghĩa best_path trước (None nếu không phải best model)
+    best_path = None
     if is_best:
         best_path = os.path.join(model_save_dir, best_filename)
         shutil.copyfile(checkpoint_path, best_path)

@@ -10,7 +10,7 @@ import timm
 import os
 import csv
 import glob # --- THÊM MỚI: Thư viện để tìm kiếm file
-from torch.cuda.amp import autocast, GradScaler  # --- THÊM MỚI: Mixed precision
+from torch.amp import autocast, GradScaler  # --- THÊM MỚI: Mixed precision (API mới)
 import psutil  # --- THÊM MỚI: Monitoring system resources
 import gc      # --- THÊM MỚI: Garbage collection
 import logging
@@ -236,7 +236,8 @@ def run_training():
     
     # --- THÊM MỚI: Mixed Precision Scaler (TẮT để tránh NaN) ---
     use_mixed_precision = getattr(config, 'MIXED_PRECISION', True) and config.DEVICE == 'cuda'
-    scaler = GradScaler() if use_mixed_precision else None
+    # Sử dụng API mới để tránh FutureWarning
+    scaler = GradScaler('cuda') if use_mixed_precision else None
     print(f"Mixed precision: {'Enabled' if scaler else 'Disabled'}")
     
     # --- THÊM MỚI: Gradient Clipping ---
@@ -299,7 +300,7 @@ def run_training():
             
             # Mixed precision forward pass
             if scaler:
-                with autocast():
+                with autocast('cuda'):
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     # Chia loss cho accumulation_steps
@@ -363,7 +364,7 @@ def run_training():
                 
                 # THÊM: Mixed precision cho validation (không ảnh hưởng accuracy)
                 if scaler:
-                    with autocast():
+                    with autocast('cuda'):
                         outputs = model(inputs)
                         loss = criterion(outputs, labels)
                 else:
