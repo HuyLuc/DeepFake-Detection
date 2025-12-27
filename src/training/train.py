@@ -261,7 +261,8 @@ def run_training():
     
     # Learning rate scheduler: giảm LR khi validation accuracy không cải thiện
     # Patience=3: đợi 3 epochs không cải thiện thì giảm LR xuống 10%
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
+    print(f"Learning rate scheduler: ReduceLROnPlateau (patience=3, factor=0.1)")
 
     # --- 3. Tải Checkpoint (nếu có) và Backup ---
     checkpoint_path = os.path.join(config.MODEL_SAVE_DIR, 'checkpoint.pth.tar')
