@@ -106,8 +106,8 @@ else:
     PIN_MEMORY = False
     MIXED_PRECISION = False
 
-LEARNING_RATE = 0.001
-WEIGHT_DECAY = 1e-4  # L2 regularization để giảm overfitting
+LEARNING_RATE = 0.0005  # Giảm từ 0.001 để tránh model "nhảy" quá xa
+WEIGHT_DECAY = 1e-5  # Giảm từ 1e-4 để tránh regularization quá mạnh
 ACCUMULATION_STEPS = 1
 
 # ==============================================================================

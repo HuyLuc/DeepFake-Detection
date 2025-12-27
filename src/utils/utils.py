@@ -48,20 +48,49 @@ def sync_to_drive(
     if not drive_dir or not os.path.exists(drive_dir):
         return
     
+    # Kiểm tra xem checkpoint_path có phải là symlink trỏ đến Drive không
+    # Nếu là symlink, file đã ở trên Drive rồi, không cần sync
     try:
-        # Sync checkpoint
+        if os.path.islink(checkpoint_path) or os.path.islink(os.path.dirname(checkpoint_path)):
+            # Đây là symlink, file đã ở trên Drive, không cần sync
+            return
+        
+        # Kiểm tra xem drive_checkpoint và checkpoint_path có phải là cùng một file không
         drive_checkpoint = os.path.join(drive_dir, filename)
-        shutil.copy2(checkpoint_path, drive_checkpoint)
+        if os.path.exists(drive_checkpoint):
+            try:
+                # Thử so sánh realpath để phát hiện symlink
+                if os.path.realpath(checkpoint_path) == os.path.realpath(drive_checkpoint):
+                    # Cùng một file (do symlink), không cần sync
+                    return
+            except:
+                pass
+        
+        # Sync checkpoint (chỉ nếu không phải cùng file)
+        try:
+            shutil.copy2(checkpoint_path, drive_checkpoint)
+            print(f"💾 Đã sync checkpoint vào Drive: {drive_checkpoint}")
+        except shutil.SameFileError:
+            # Cùng một file (do symlink), không cần sync - im lặng
+            pass
         
         # Sync best model nếu có
         if is_best and best_path and os.path.exists(best_path):
             drive_best = os.path.join(drive_dir, best_filename)
-            shutil.copy2(best_path, drive_best)
-            print(f"💾 Đã sync best model vào Drive: {drive_best}")
-        else:
-            print(f"💾 Đã sync checkpoint vào Drive: {drive_checkpoint}")
+            # Kiểm tra tương tự cho best_path
+            if not (os.path.islink(best_path) or 
+                    (os.path.exists(drive_best) and 
+                     os.path.realpath(best_path) == os.path.realpath(drive_best))):
+                try:
+                    shutil.copy2(best_path, drive_best)
+                    print(f"💾 Đã sync best model vào Drive: {drive_best}")
+                except shutil.SameFileError:
+                    # Cùng một file, không cần sync - im lặng
+                    pass
     except Exception as e:
-        print(f"⚠️ Không thể sync checkpoint vào Drive: {e}")
+        # Chỉ in lỗi nếu không phải SameFileError
+        if "samefileerror" not in str(type(e).__name__).lower() and "same file" not in str(e).lower():
+            print(f"⚠️ Không thể sync checkpoint vào Drive: {e}")
 
 def sync_logs_to_drive() -> None:
     """Tự động sync log files vào Google Drive"""
@@ -79,11 +108,31 @@ def sync_logs_to_drive() -> None:
     
     for log_file in log_files:
         if os.path.exists(log_file):
+            # Kiểm tra xem log_file có phải là symlink trỏ đến Drive không
+            if os.path.islink(log_file) or os.path.islink(os.path.dirname(log_file)):
+                # Đây là symlink, file đã ở trên Drive, không cần sync
+                continue
+            
+            drive_log = os.path.join(drive_log_dir, os.path.basename(log_file))
+            
+            # Kiểm tra xem có phải cùng một file không (do symlink)
+            if os.path.exists(drive_log):
+                try:
+                    if os.path.realpath(log_file) == os.path.realpath(drive_log):
+                        # Cùng một file, không cần sync
+                        continue
+                except:
+                    pass
+            
             try:
-                drive_log = os.path.join(drive_log_dir, os.path.basename(log_file))
                 shutil.copy2(log_file, drive_log)
+            except shutil.SameFileError:
+                # Cùng một file (do symlink), không cần sync - im lặng
+                pass
             except Exception as e:
-                print(f"⚠️ Không thể sync {log_file} vào Drive: {e}")
+                # Chỉ in lỗi nếu không phải SameFileError
+                if "samefileerror" not in str(type(e).__name__).lower() and "same file" not in str(e).lower():
+                    print(f"⚠️ Không thể sync {log_file} vào Drive: {e}")
 
 def load_checkpoint(
     checkpoint_path: str, 
