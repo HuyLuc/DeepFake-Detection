@@ -18,15 +18,25 @@ import logging
 # Import từ các file khác trong dự án
 from configs import config
 from src.training.dataset import DeepfakeDataset
-from src.utils.utils import save_checkpoint, load_checkpoint
+from src.utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
 
-# Thiết lập logging
+# Thiết lập logging với UTF-8 encoding để tránh lỗi Unicode trên Windows
+import sys
+if sys.platform == 'win32':
+    # Fix encoding cho Windows console
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(config.EVALUATION_RESULTS_DIR, 'training.log')),
-        logging.StreamHandler()
+        logging.FileHandler(
+            os.path.join(config.EVALUATION_RESULTS_DIR, 'training.log'),
+            encoding='utf-8'  # Dùng UTF-8 cho file log
+        ),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
@@ -77,7 +87,7 @@ def run_training():
     
     print("--- 🚀 Bắt đầu quá trình huấn luyện ---")
     logger.info("="*50)
-    logger.info("Bắt đầu quá trình huấn luyện")
+    logger.info("Bat dau qua trinh huan luyen")
     logger.info("="*50)
     
     # THÊM: CUDA optimizations (không ảnh hưởng model accuracy)
@@ -386,7 +396,7 @@ def run_training():
             best_val_acc = val_acc
             early_stopping_counter = 0  # Reset counter khi có improvement
             print(f"🎉 New best validation accuracy: {best_val_acc:.4f}")
-            logger.info(f"🎉 New best validation accuracy: {best_val_acc:.4f}")
+            logger.info(f"New best validation accuracy: {best_val_acc:.4f}")
         else:
             early_stopping_counter += 1
             print(f"No improvement for {early_stopping_counter} epochs")
@@ -396,6 +406,10 @@ def run_training():
             'epoch': epoch, 'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(), 'best_val_acc': best_val_acc,
         }, is_best=is_best)
+        
+        # Tự động sync logs vào Drive sau mỗi epoch (nếu bật)
+        if hasattr(config, 'AUTO_SYNC_EVERY_EPOCH') and config.AUTO_SYNC_EVERY_EPOCH:
+            sync_logs_to_drive()
         
         # Early stopping check
         if early_stopping_counter >= early_stopping_patience:
@@ -407,5 +421,10 @@ def run_training():
         
     print("\n--- ✅ Hoàn tất huấn luyện! ---")
     logger.info("="*50)
-    logger.info(f"Hoàn tất huấn luyện! Best validation accuracy: {best_val_acc:.4f}")
+    logger.info(f"Hoan tat huan luyen! Best validation accuracy: {best_val_acc:.4f}")
     logger.info("="*50)
+    
+    # Sync logs lần cuối sau khi training xong
+    if hasattr(config, 'USE_DRIVE_FOR_LOGS') and config.USE_DRIVE_FOR_LOGS:
+        sync_logs_to_drive()
+        print("💾 Đã sync logs vào Google Drive")

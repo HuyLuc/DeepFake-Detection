@@ -27,6 +27,61 @@ def save_checkpoint(
         shutil.copyfile(checkpoint_path, best_path)
         print(f"🎉 Saved new best model to {best_path}")
 
+    # Tự động sync vào Google Drive nếu đang dùng Colab
+    sync_to_drive(checkpoint_path, filename, is_best, best_path, best_filename)
+
+def sync_to_drive(
+    checkpoint_path: str,
+    filename: str,
+    is_best: bool = False,
+    best_path: Optional[str] = None,
+    best_filename: str = 'model_best.pth.tar'
+) -> None:
+    """Tự động sync checkpoint vào Google Drive"""
+    if not hasattr(config, 'USE_DRIVE_FOR_CHECKPOINTS') or not config.USE_DRIVE_FOR_CHECKPOINTS:
+        return
+    
+    drive_dir = getattr(config, 'DRIVE_CHECKPOINT_DIR', None)
+    if not drive_dir or not os.path.exists(drive_dir):
+        return
+    
+    try:
+        # Sync checkpoint
+        drive_checkpoint = os.path.join(drive_dir, filename)
+        shutil.copy2(checkpoint_path, drive_checkpoint)
+        
+        # Sync best model nếu có
+        if is_best and best_path and os.path.exists(best_path):
+            drive_best = os.path.join(drive_dir, best_filename)
+            shutil.copy2(best_path, drive_best)
+            print(f"💾 Đã sync best model vào Drive: {drive_best}")
+        else:
+            print(f"💾 Đã sync checkpoint vào Drive: {drive_checkpoint}")
+    except Exception as e:
+        print(f"⚠️ Không thể sync checkpoint vào Drive: {e}")
+
+def sync_logs_to_drive() -> None:
+    """Tự động sync log files vào Google Drive"""
+    if not hasattr(config, 'USE_DRIVE_FOR_LOGS') or not config.USE_DRIVE_FOR_LOGS:
+        return
+    
+    drive_log_dir = getattr(config, 'DRIVE_LOG_DIR', None)
+    if not drive_log_dir or not os.path.exists(drive_log_dir):
+        return
+    
+    log_files = [
+        os.path.join(config.EVALUATION_RESULTS_DIR, 'training.log'),
+        os.path.join(config.EVALUATION_RESULTS_DIR, 'training_log.csv')
+    ]
+    
+    for log_file in log_files:
+        if os.path.exists(log_file):
+            try:
+                drive_log = os.path.join(drive_log_dir, os.path.basename(log_file))
+                shutil.copy2(log_file, drive_log)
+            except Exception as e:
+                print(f"⚠️ Không thể sync {log_file} vào Drive: {e}")
+
 def load_checkpoint(
     checkpoint_path: str, 
     model: torch.nn.Module, 
@@ -48,7 +103,7 @@ def load_checkpoint(
         return model, optimizer, 0, 0.0
     
     try:
-        print(f"✅ Loading checkpoint from '{checkpoint_path}'")
+    print(f"✅ Loading checkpoint from '{checkpoint_path}'")
         # Sử dụng weights_only=False để tương thích với các checkpoint cũ
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'), weights_only=False)
         
@@ -76,16 +131,16 @@ def load_checkpoint(
         # Load state dict với strict=False để bỏ qua các key không khớp
         model.load_state_dict(checkpoint['state_dict'], strict=False)
         
-        if optimizer and 'optimizer' in checkpoint:
+    if optimizer and 'optimizer' in checkpoint:
             try:
-                optimizer.load_state_dict(checkpoint['optimizer'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
             except Exception as e:
                 print(f"⚠️ Cảnh báo: Không thể load optimizer state: {e}. Sử dụng optimizer mới.")
         
-        start_epoch = checkpoint.get('epoch', 0) + 1
-        best_val_acc = checkpoint.get('best_val_acc', 0.0)
+    start_epoch = checkpoint.get('epoch', 0) + 1
+    best_val_acc = checkpoint.get('best_val_acc', 0.0)
         print(f"✅ Checkpoint loaded. Resuming from epoch {start_epoch}, best val acc: {best_val_acc:.4f}")
-        return model, optimizer, start_epoch, best_val_acc
+    return model, optimizer, start_epoch, best_val_acc
         
     except Exception as e:
         print(f"❌ Lỗi khi load checkpoint: {e}")
