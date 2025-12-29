@@ -260,9 +260,9 @@ def run_training():
     # ----------------------------------------------
     
     # Learning rate scheduler: giảm LR khi validation accuracy không cải thiện
-    # Patience=3: đợi 3 epochs không cải thiện thì giảm LR xuống 10%
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
-    print(f"Learning rate scheduler: ReduceLROnPlateau (patience=3, factor=0.1)")
+    # ĐIỀU CHỈNH: Patience=2 (giảm từ 3) để trigger sớm hơn, tránh overfitting
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=2)
+    print(f"Learning rate scheduler: ReduceLROnPlateau (patience=2, factor=0.1) - đã điều chỉnh để tránh overfitting")
 
     # --- 3. Tải Checkpoint (nếu có) và Backup ---
     checkpoint_path = os.path.join(config.MODEL_SAVE_DIR, 'checkpoint.pth.tar')
@@ -279,10 +279,11 @@ def run_training():
     print(f"📊 Tiếp tục training từ epoch {start_epoch}, best val acc: {best_val_acc:.4f}")
 
     # --- THÊM MỚI: Early Stopping ---
-    # Giảm patience từ 7 xuống 4 để dừng sớm hơn khi overfitting
-    early_stopping_patience = 4
+    # ĐIỀU CHỈNH: Giảm patience từ 4 xuống 2 để dừng sớm hơn khi overfitting
+    # Dựa trên phân tích: model bắt đầu overfitting từ epoch 5-6, cần dừng sớm hơn
+    early_stopping_patience = 2
     early_stopping_counter = 0
-    print(f"Early stopping patience: {early_stopping_patience} epochs (đã tối ưu để tránh overfitting)")
+    print(f"Early stopping patience: {early_stopping_patience} epochs (đã điều chỉnh để tránh overfitting nghiêm trọng)")
 
     # --- 4. Vòng lặp Huấn luyện và Kiểm định ---
     print("\n--- Bắt đầu vòng lặp huấn luyện ---")

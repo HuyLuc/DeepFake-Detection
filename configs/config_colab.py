@@ -106,8 +106,9 @@ else:
     PIN_MEMORY = False
     MIXED_PRECISION = False
 
-LEARNING_RATE = 0.0005  # Giảm từ 0.001 để tránh model "nhảy" quá xa
-WEIGHT_DECAY = 1e-5  # Giảm từ 1e-4 để tránh regularization quá mạnh
+# ĐIỀU CHỈNH ĐỂ TRÁNH OVERFITTING (dựa trên phân tích training log)
+LEARNING_RATE = 0.0001  # Giảm từ 0.0005 → 0.0001 để học ổn định hơn, tránh overfitting
+WEIGHT_DECAY = 1e-4  # Tăng từ 1e-5 → 1e-4 để tăng regularization, giảm overfitting
 ACCUMULATION_STEPS = 1
 
 # ==============================================================================

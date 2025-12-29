@@ -4,12 +4,180 @@
 
 ## 📋 MỤC LỤC
 
-1. [Tổng quan quy trình](#1-tổng-quan-quy-trình)
-2. [Giai đoạn 1: Tiền xử lý dữ liệu](#2-giai-đoạn-1-tiền-xử-lý-dữ-liệu)
-3. [Giai đoạn 2: Huấn luyện mô hình](#3-giai-đoạn-2-huấn-luyện-mô-hình)
-4. [Giai đoạn 3: Đánh giá mô hình](#4-giai-đoạn-3-đánh-giá-mô-hình)
-5. [Giai đoạn 4: Dự đoán (Inference)](#5-giai-đoạn-4-dự-đoán-inference)
-6. [Sơ đồ tổng hợp](#6-sơ-đồ-tổng-hợp)
+1. [Giải thích dễ hiểu về quy trình](#0-giải-thích-dễ-hiểu-về-quy-trình)
+2. [Tổng quan quy trình](#1-tổng-quan-quy-trình)
+3. [Giai đoạn 1: Tiền xử lý dữ liệu](#2-giai-đoạn-1-tiền-xử-lý-dữ-liệu)
+4. [Giai đoạn 2: Huấn luyện mô hình](#3-giai-đoạn-2-huấn-luyện-mô-hình)
+5. [Giai đoạn 3: Đánh giá mô hình](#4-giai-đoạn-3-đánh-giá-mô-hình)
+6. [Giai đoạn 4: Dự đoán (Inference)](#5-giai-đoạn-4-dự-đoán-inference)
+7. [Sơ đồ tổng hợp](#6-sơ-đồ-tổng-hợp)
+
+---
+
+## 0. GIẢI THÍCH DỄ HIỂU VỀ QUY TRÌNH
+
+### 🎯 Bài toán là gì?
+
+Bạn có một video và muốn biết video đó là **THẬT** hay **GIẢ MẠO (Deepfake)**. Hệ thống sẽ tự động phân tích và cho bạn biết kết quả.
+
+### 🔄 Quy trình hoạt động như thế nào?
+
+Hãy tưởng tượng bạn đang dạy một đứa trẻ nhận biết tiền giả:
+
+#### **BƯỚC 1: Chuẩn bị tài liệu học tập (Tiền xử lý dữ liệu)**
+
+**Giống như:** Bạn thu thập nhiều tờ tiền thật và tiền giả, rồi cắt ra phần quan trọng nhất (hình chân dung) để dễ so sánh.
+
+**Trong hệ thống:**
+- Có rất nhiều video (một số thật, một số giả)
+- Từ mỗi video, hệ thống sẽ:
+  1. Chọn ra 10 khung hình đại diện (giống như chọn 10 tờ tiền mẫu)
+  2. Tìm khuôn mặt trong mỗi khung hình (giống như cắt phần chân dung)
+  3. Lưu lại 10 ảnh khuôn mặt đó
+
+**Kết quả:** Có hàng nghìn ảnh khuôn mặt được phân loại sẵn là "THẬT" hoặc "GIẢ"
+
+---
+
+#### **BƯỚC 2: Dạy máy tính học (Huấn luyện mô hình)**
+
+**Giống như:** Bạn cho đứa trẻ xem hàng nghìn tờ tiền đã được đánh dấu "thật" hoặc "giả", và dạy nó nhận biết các đặc điểm khác biệt.
+
+**Trong hệ thống:**
+1. **Nạp dữ liệu:** Đưa tất cả ảnh khuôn mặt vào máy tính
+2. **Xây dựng "bộ não":** Tạo một mô hình AI (giống như bộ não) có khả năng học
+3. **Học từng bước:**
+   - Xem một ảnh → Đoán là thật hay giả
+   - So sánh với đáp án → Biết đúng hay sai
+   - Điều chỉnh "bộ não" để đoán đúng hơn
+   - Lặp lại hàng nghìn lần
+4. **Kiểm tra:** Sau mỗi lần học, kiểm tra xem đoán đúng bao nhiêu phần trăm
+5. **Lưu lại:** Khi "bộ não" đã học tốt, lưu lại để dùng sau
+
+**Kết quả:** Một "bộ não" đã được huấn luyện, có thể nhận biết video thật/giả
+
+---
+
+#### **BƯỚC 3: Kiểm tra khả năng (Đánh giá mô hình)**
+
+**Giống như:** Cho đứa trẻ xem những tờ tiền mới (chưa từng thấy) và xem nó đoán đúng bao nhiêu phần trăm.
+
+**Trong hệ thống:**
+- Dùng một bộ video mới (chưa từng dùng để học)
+- Cho "bộ não" đoán từng video
+- Tính toán: Đoán đúng bao nhiêu %, sai bao nhiêu %
+- Tạo báo cáo chi tiết về khả năng của hệ thống
+
+**Kết quả:** Biết được hệ thống chính xác đến mức nào
+
+---
+
+#### **BƯỚC 4: Sử dụng thực tế (Dự đoán)**
+
+**Giống như:** Khi có một tờ tiền mới, bạn đưa cho đứa trẻ xem và nó sẽ nói "thật" hoặc "giả".
+
+**Trong hệ thống:**
+1. Người dùng upload một video mới
+2. Hệ thống xử lý video:
+   - Chọn một số khung hình từ video
+   - Tìm khuôn mặt trong mỗi khung hình
+   - Cắt khuôn mặt ra
+3. Cho "bộ não" xem từng ảnh khuôn mặt:
+   - "Bộ não" đoán: "Ảnh này 85% là giả"
+   - "Ảnh này 92% là thật"
+   - "Ảnh này 78% là giả"
+4. Tổng hợp kết quả:
+   - Nếu nhiều ảnh được đoán là "giả" → Video là **FAKE**
+   - Nếu hầu hết là "thật" → Video là **REAL**
+5. Trả về kết quả cho người dùng
+
+**Kết quả:** Người dùng biết video của họ là thật hay giả
+
+---
+
+### 📊 Tóm tắt bằng ví dụ đơn giản
+
+| Giai đoạn | Ví dụ đời thường | Trong hệ thống |
+|-----------|------------------|----------------|
+| **1. Tiền xử lý** | Cắt ảnh chân dung từ tiền | Cắt khuôn mặt từ video |
+| **2. Huấn luyện** | Dạy trẻ nhận biết tiền giả | Dạy AI nhận biết Deepfake |
+| **3. Đánh giá** | Kiểm tra khả năng của trẻ | Test độ chính xác của AI |
+| **4. Dự đoán** | Xem tiền mới và đoán | Phân tích video mới |
+
+---
+
+### 🔍 Chi tiết từng bước (dễ hiểu hơn)
+
+#### **Giai đoạn 1: Tại sao phải cắt khuôn mặt?**
+
+- Video rất lớn và phức tạp
+- Chỉ phần khuôn mặt mới có dấu hiệu Deepfake
+- Giống như khi kiểm tra tiền, bạn chỉ cần xem phần chân dung, không cần xem toàn bộ tờ tiền
+
+#### **Giai đoạn 2: "Bộ não" học như thế nào?**
+
+- **Lần 1:** Xem ảnh → Đoán sai → Điều chỉnh
+- **Lần 2:** Xem ảnh khác → Đoán đúng hơn một chút → Điều chỉnh tiếp
+- **Lần 1000:** Đoán khá chính xác
+- **Lần 10000:** Đoán rất chính xác
+
+Quá trình này lặp lại hàng nghìn lần cho đến khi "bộ não" học được các đặc điểm để phân biệt.
+
+#### **Giai đoạn 3: Tại sao phải kiểm tra?**
+
+- Để biết "bộ não" có thực sự học được hay chỉ học thuộc lòng
+- Giống như kiểm tra học sinh: không cho xem bài cũ, chỉ cho bài mới
+
+#### **Giai đoạn 4: Tại sao phải xem nhiều khung hình?**
+
+- Một khung hình có thể bị lỗi hoặc không rõ
+- Xem nhiều khung hình → Nhiều bằng chứng → Kết quả chính xác hơn
+- Giống như: Một người nói "tiền này giả" → Chưa chắc. Nhiều người nói → Chắc chắn hơn
+
+---
+
+### 🎓 Hiểu về các thuật ngữ
+
+| Thuật ngữ | Giải thích đơn giản |
+|-----------|---------------------|
+| **Frame** | Một khung hình trong video (giống như một bức ảnh) |
+| **Face Detection** | Tìm khuôn mặt trong ảnh (giống như tìm khuôn mặt trong đám đông) |
+| **Model/Model** | "Bộ não" của máy tính, có khả năng học và nhận biết |
+| **Training** | Quá trình dạy "bộ não" học |
+| **Checkpoint** | Lưu lại trạng thái "bộ não" đã học (giống như lưu bài học) |
+| **Inference** | Sử dụng "bộ não" đã học để đoán video mới |
+| **Confidence** | Độ tin cậy (ví dụ: 85% chắc chắn là giả) |
+
+---
+
+### 💡 Ví dụ cụ thể
+
+**Tình huống:** Bạn có một video và muốn kiểm tra xem có phải Deepfake không.
+
+**Quy trình:**
+1. Bạn upload video lên hệ thống
+2. Hệ thống tự động:
+   - Chọn 10 khung hình từ video (ví dụ: khung hình số 0, 100, 200, ...)
+   - Tìm khuôn mặt trong mỗi khung hình
+   - Cắt ra 10 ảnh khuôn mặt
+3. Cho "bộ não" xem 10 ảnh:
+   - Ảnh 1: 90% là FAKE
+   - Ảnh 2: 85% là FAKE
+   - Ảnh 3: 88% là FAKE
+   - Ảnh 4: 92% là REAL
+   - Ảnh 5: 87% là FAKE
+   - ... (10 ảnh)
+4. Tổng hợp: 7/10 ảnh là FAKE → Video là **FAKE**
+5. Trả kết quả: "Video này có 70% khả năng là Deepfake"
+
+---
+
+### 🚀 Tại sao quy trình này hiệu quả?
+
+1. **Tập trung vào phần quan trọng:** Chỉ xử lý khuôn mặt, không xử lý toàn bộ video
+2. **Học từ nhiều ví dụ:** Xem hàng nghìn ảnh để học được đặc điểm
+3. **Kiểm tra kỹ lưỡng:** Đảm bảo "bộ não" thực sự học được, không chỉ học thuộc
+4. **Xem nhiều bằng chứng:** Phân tích nhiều khung hình để kết quả chính xác hơn
 
 ---
 
