@@ -155,7 +155,7 @@ def load_checkpoint(
         return model, optimizer, 0, 0.0
     
     try:
-    print(f"✅ Loading checkpoint from '{checkpoint_path}'")
+        print(f"✅ Loading checkpoint from '{checkpoint_path}'")
         # Sử dụng weights_only=False để tương thích với các checkpoint cũ
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'), weights_only=False)
         
@@ -183,16 +183,16 @@ def load_checkpoint(
         # Load state dict với strict=False để bỏ qua các key không khớp
         model.load_state_dict(checkpoint['state_dict'], strict=False)
         
-    if optimizer and 'optimizer' in checkpoint:
+        if optimizer and 'optimizer' in checkpoint:
             try:
-        optimizer.load_state_dict(checkpoint['optimizer'])
+                optimizer.load_state_dict(checkpoint['optimizer'])
             except Exception as e:
                 print(f"⚠️ Cảnh báo: Không thể load optimizer state: {e}. Sử dụng optimizer mới.")
         
-    start_epoch = checkpoint.get('epoch', 0) + 1
-    best_val_acc = checkpoint.get('best_val_acc', 0.0)
+        start_epoch = checkpoint.get('epoch', 0) + 1
+        best_val_acc = checkpoint.get('best_val_acc', 0.0)
         print(f"✅ Checkpoint loaded. Resuming from epoch {start_epoch}, best val acc: {best_val_acc:.4f}")
-    return model, optimizer, start_epoch, best_val_acc
+        return model, optimizer, start_epoch, best_val_acc
         
     except Exception as e:
         print(f"❌ Lỗi khi load checkpoint: {e}")

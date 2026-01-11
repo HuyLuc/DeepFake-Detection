@@ -167,6 +167,18 @@ def run_preprocessing():
     num_processes = min(2, max(1, num_workers // 2))  # Giảm xuống 1/2
     print(f"Sử dụng {num_processes} luồng để xử lý (tối ưu cho máy yếu)...")
     
-    with multiprocessing.Pool(processes=num_processes) as pool:
-        list(tqdm(pool.imap_unordered(process_single_video, tasks), total=len(tasks), desc="Đang xử lý video"))
+    pool = multiprocessing.Pool(processes=num_processes)
+    try:
+        # Sử dụng imap_unordered để bắt đầu nhận kết quả ngay lập tức
+        results = list(tqdm(pool.imap_unordered(process_single_video, tasks), total=len(tasks), desc="Đang xử lý video"))
+        pool.close()
+    except KeyboardInterrupt:
+        print("\n⚠️ Nhận tín hiệu dừng (Ctrl+C). Đang dừng các tiến trình con...")
+        pool.terminate()
+    except Exception as e:
+        print(f"\n❌ Lỗi trong quá trình xử lý: {e}")
+        pool.terminate()
+    finally:
+        pool.join()
+        
     print("\n--- Hoàn tất quá trình tiền xử lý! ---")

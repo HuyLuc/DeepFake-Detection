@@ -12,12 +12,17 @@ import os
 import tempfile
 import mediapipe as mp
 import logging
+import atexit
 
 # Import từ các file khác trong dự án
 from configs import config
 from src.utils.utils import load_checkpoint
 
-# --- 1. KHỞI TẠO ỨNG DỤNG VÀ CÁC THÀNH PHẦN CỐ ĐỊNH ---
+from flask_wtf.csrf import CSRFProtect
+
+# ==============================================================================
+# --- 1. 🚀 KHỞI TẠO ỨNG DỤNG VÀ CÁC THÀNH PHẦN CỐ ĐỊNH ---
+# ==============================================================================
 # Thiết lập logging
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +33,11 @@ logger = logging.getLogger(__name__)
 logger.info("--- 🚀 Khởi tạo ứng dụng và tải mô hình ---")
 app = Flask(__name__, template_folder='templates')
 
-# Tải mô hình MỘT LẦN DUY NHẤT khi ứng dụng khởi động
+# 🔐 Cấu hình bảo mật
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'deepfake-detection-secret-key-2026')
+csrf = CSRFProtect(app)
+
+# 🤖 Tải mô hình MỘT LẦN DUY NHẤT khi ứng dụng khởi động
 # Sử dụng config.DEVICE thay vì hardcode CPU
 device = torch.device(config.DEVICE)
 num_classes = len(config.CLASS_NAMES)
@@ -61,10 +70,12 @@ face_detector = mp_face_detection.FaceDetection(
 # Sử dụng CLASS_NAMES từ config thay vì hardcode
 CLASS_NAMES = config.CLASS_NAMES
 
-# --- 2. CÁC HÀM XỬ LÝ LOGIC ---
+# ==============================================================================
+# --- 2. 🧠 CÁC HÀM XỬ LÝ LOGIC ---
+# ==============================================================================
 
 def predict_single_face(face_image: Image.Image) -> Tuple[str, float]:
-    """Dự đoán trên MỘT ảnh khuôn mặt đã được cắt.
+    """🔮 Dự đoán trên MỘT ảnh khuôn mặt đã được cắt.
     
     Args:
         face_image: PIL Image của khuôn mặt đã được cắt
@@ -83,16 +94,28 @@ def predict_single_face(face_image: Image.Image) -> Tuple[str, float]:
     confidence_score = confidence.item()
     return predicted_class, confidence_score
 
-# --- 3. ĐỊNH NGHĨA CÁC ĐƯỜNG DẪN (ROUTES) ---
+# ==============================================================================
+# --- 3. 🌐 ĐỊNH NGHĨA CÁC ĐƯỜNG DẪN (ROUTES) ---
+# ==============================================================================
 
 @app.route('/', methods=['GET'])
 def index():
-    """Render trang chủ."""
+    """🏠 Render trang chủ."""
     return render_template('index.html')
+
+@app.route('/health', methods=['GET'])
+def health():
+    """💚 Endpoint kiểm tra trạng thái hệ thống."""
+    return jsonify({
+        'status': 'healthy',
+        'device': str(device),
+        'model_loaded': model is not None,
+        'model_name': config.MODEL_NAME
+    })
 
 def validate_video_file(file) -> Tuple[bool, Optional[str]]:
     """
-    Kiểm tra tính hợp lệ của file video.
+    🔍 Kiểm tra tính hợp lệ của file video.
     
     Args:
         file: File object từ Flask request
@@ -100,40 +123,43 @@ def validate_video_file(file) -> Tuple[bool, Optional[str]]:
     Returns:
         Tuple (is_valid, error_message)
     """
-    # Kiểm tra tên file
+    # ✅ Kiểm tra tên file
     if not file.filename:
-        return False, "Chưa chọn file nào"
+        return False, "❌ Chưa chọn file nào"
     
-    # Kiểm tra extension
+    # 📄 Kiểm tra extension
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in config.ALLOWED_VIDEO_EXTENSIONS:
-        return False, f"Định dạng file không được hỗ trợ. Chỉ chấp nhận: {', '.join(config.ALLOWED_VIDEO_EXTENSIONS)}"
+        return False, f"❌ Định dạng file không được hỗ trợ. Chỉ chấp nhận: {', '.join(config.ALLOWED_VIDEO_EXTENSIONS)}"
     
-    # Kiểm tra kích thước file
+    # 📊 Kiểm tra kích thước file
     file.seek(0, os.SEEK_END)
     file_size_mb = file.tell() / (1024 * 1024)
     file.seek(0)  # Reset file pointer
     
     if file_size_mb > config.MAX_VIDEO_SIZE_MB:
-        return False, f"File quá lớn. Kích thước tối đa: {config.MAX_VIDEO_SIZE_MB}MB"
+        return False, f"❌ File quá lớn. Kích thước tối đa: {config.MAX_VIDEO_SIZE_MB}MB"
     
     return True, None
 
 @app.route('/predict_video', methods=['POST'])
 def predict_video():
+    """🎬 API endpoint để phân tích video và phát hiện deepfake."""
+    """🎬 API endpoint để phân tích video và phát hiện deepfake."""
     if 'file' not in request.files:
-        return jsonify({'error': 'Không có file nào được gửi lên'}), 400
+        return jsonify({'error': '❌ Không có file nào được gửi lên'}), 400
     
     file = request.files['file']
     
     # Validation input
     is_valid, error_msg = validate_video_file(file)
     if not is_valid:
-        logger.warning(f"Invalid file upload: {error_msg}")
+        logger.warning(f"⚠️ Invalid file upload: {error_msg}")
         return jsonify({'error': error_msg}), 400
 
     # Lưu file video tạm thời để xử lý
     temp_video_path = None
+    cap = None
     try:
         # Bug fix: Ghi trực tiếp vào file handle đã mở thay vì dùng file.save()
         # để tránh file locking error trên Windows
@@ -145,15 +171,12 @@ def predict_video():
 
         cap = cv2.VideoCapture(temp_video_path)
         if not cap.isOpened():
-            # Bug fix: Release VideoCapture trước khi return để tránh file lock error trên Windows
-            cap.release()
             return jsonify({'error': 'Không thể mở file video. Vui lòng kiểm tra định dạng video.'}), 500
 
         # Kiểm tra video có hợp lệ không
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if fps <= 0 or total_frames <= 0:
-            cap.release()
             return jsonify({'error': 'Video không hợp lệ hoặc không có frame nào'}), 400
 
         fake_evidence_count = 0
@@ -214,9 +237,9 @@ def predict_video():
         # Tính tỷ lệ fake evidence
         fake_ratio = fake_evidence_count / frames_with_face if frames_with_face > 0 else 0
         
-        # Quyết định dựa trên tỷ lệ và số lượng evidence
-        # Cần ít nhất 30% frames có fake evidence hoặc có ít nhất 3 frames fake với confidence cao
-        if fake_ratio >= 0.3 or (fake_evidence_count >= 3 and strongest_fake_confidence >= 0.85):
+        # Quyết định dựa trên tỷ lệ và số lượng evidence từ config
+        if fake_ratio >= config.FAKE_RATIO_THRESHOLD or \
+           (fake_evidence_count >= config.MIN_FAKE_EVIDENCE_COUNT and strongest_fake_confidence >= config.STRONG_CONFIDENCE_THRESHOLD):
             final_verdict = "FAKE"
             avg_confidence = sum(fake_confidences) / len(fake_confidences) if fake_confidences else 0
             reason = (
@@ -245,11 +268,28 @@ def predict_video():
         logger.error(f"Error processing video: {e}", exc_info=True)
         return jsonify({'error': f'Lỗi khi xử lý video: {str(e)}'}), 500
     finally:
+        if cap is not None:
+            cap.release()
         if temp_video_path and os.path.exists(temp_video_path):
-            os.remove(temp_video_path)  # Xóa file tạm
+            try:
+                os.remove(temp_video_path)  # Xóa file tạm
+            except Exception as e:
+                logger.error(f"Failed to delete temp file {temp_video_path}: {e}")
 
 def run_app():
+
     # Chạy app ở chế độ debug=False khi triển khai thực tế
+
     # Lưu ý: debug=True chỉ dùng cho development, không dùng trong production
+
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+
+    
+
+    # Đảm bảo giải phóng tài nguyên khi thoát
+
+    atexit.register(lambda: face_detector.close())
+
+    
+
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)
