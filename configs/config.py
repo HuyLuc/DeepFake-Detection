@@ -42,7 +42,7 @@ MANIPULATION_DIRS = {
 # --- 2. CẤU HÌNH TIỀN XỬ LÝ (PREPROCESSING CONFIGURATION) ---
 # ==============================================================================
 COMPRESSION_LEVEL = 'c23'
-NUM_FRAMES_PER_VIDEO = 10  # GIẢM từ 30 → 10 để giảm thời gian training ~66%
+NUM_FRAMES_PER_VIDEO = 20  # 🆙 TĂNG từ 10 → 20 frames/video để model học nhiều temporal patterns hơn
 RANDOM_SEED = 42
 TRAIN_SPLIT = 0.8
 VAL_SPLIT = 0.1
@@ -92,17 +92,21 @@ EVIDENCE_THRESHOLD = 0.65       # ⚖️ Ngưỡng confidence tối thiểu đ�
 # ==============================================================================
 # --- 🎓 TỐI ƯU TRIỆT ĐỂ CHO GPU MX130 (2GB VRAM) ---
 # ==============================================================================
-IMAGE_SIZE = (224, 224)  # 📐 Giữ nguyên để tương thích với checkpoint
-NUM_EPOCHS = 7  # 🔄 Tăng lên vì mỗi epoch giờ nhanh hơn
+# 📐 NÂNG CẤP: Tăng độ phân giải từ 224x224 lên 380x380
+# EfficientNet-B4 được thiết kế tối ưu cho 380x380
+# Giúp model nhìn rõ các chi tiết nhỏ (artifacts) ở mép da, răng, mắt
+IMAGE_SIZE = (380, 380)  # 🆙 Nâng cấp từ (224, 224) -> (380, 380)
+
+NUM_EPOCHS = 10  # 🔄 Tăng từ 7 -> 10 vì model cần nhiều thời gian hơn với resolution cao
 if DEVICE == "cuda":
-    # 🚀 TĂNG BATCH SIZE để tăng tốc độ training đáng kể
-    BATCH_SIZE = 16  # Tăng từ 4 → 16 (giảm 75% số iterations)
-    NUM_WORKERS = 6  # 👷 Tăng từ 2 → 6 để data loading không bị bottleneck
+    # ⚠️ GIẢM BATCH SIZE vì resolution cao hơn -> cần nhiều VRAM hơn
+    BATCH_SIZE = 8  # Giảm từ 16 → 8 để tránh OOM với resolution 380x380
+    NUM_WORKERS = 4  # 👷 Giảm từ 6 → 4 để cân bằng với batch size nhỏ hơn
     PIN_MEMORY = True  # ⚡ Tăng tốc CPU->GPU transfer
-    MIXED_PRECISION = True  # 🎯 BẬT mixed precision để tăng tốc ~2x
+    MIXED_PRECISION = True  # 🎯 BẬT mixed precision để tăng tốc ~2x (QUAN TRỌNG với resolution cao)
     GRADIENT_CLIPPING = True  # ✂️ THÊM gradient clipping
     MAX_GRAD_NORM = 1.0      # 📏 Giới hạn gradient norm
-    PREFETCH_FACTOR = 4  # 📦 Tăng từ 2 → 4 để prefetch nhiều hơn
+    PREFETCH_FACTOR = 2  # 📦 Giảm từ 4 → 2 để tiết kiệm memory
 else:
     BATCH_SIZE = 2
     NUM_WORKERS = 0
@@ -115,6 +119,25 @@ WEIGHT_DECAY = 1e-4  # 🔒 Tăng từ 1e-5 → 1e-4 để tăng regularization,
 
 # Gradient accumulation - KHÔNG CẦN vì batch size đã đủ lớn
 ACCUMULATION_STEPS = 1  # ⏭️ Tắt accumulation để tăng tốc độ
+
+# ==============================================================================
+# --- 📊 CẤU HÌNH DATA AUGMENTATION & BALANCING (MỚI) ---
+# ==============================================================================
+# 🎨 Deepfake-specific Augmentation
+USE_DEEPFAKE_AUGMENTATION = True  # Bật/tắt augmentation chuyên biệt cho Deepfake
+ENABLE_COMPRESSION_AUG = True     # JPEG compression artifacts
+ENABLE_NOISE_AUG = True            # Gaussian noise
+ENABLE_BLUR_AUG = True             # Adaptive Gaussian blur
+ENABLE_CUTOUT_AUG = True           # Face cutout
+
+# ⚖️ Data Balancing (Oversampling)
+USE_OVERSAMPLING = True            # Bật/tắt oversampling
+OVERSAMPLING_METHOD = 'oversampling'  # 'oversampling' hoặc 'weighted_sampler'
+OVERSAMPLE_RATIO = 1.3             # Tỷ lệ oversample cho lớp thiểu số (REAL)
+                                   # 1.0 = cân bằng hoàn toàn
+                                   # 1.3 = lớp REAL sẽ có 1.3x số mẫu của lớp FAKE
+                                   # Giảm False Positive bằng cách cho model nhìn REAL nhiều hơn
+
 
 # ==============================================================================
 # --- 🌐 CẤU HÌNH ỨNG DỤNG WEB (APP CONFIGURATION) ---

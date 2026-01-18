@@ -127,27 +127,52 @@ def run_training():
             writer = csv.writer(f)
             writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc', 'learning_rate'])
     
-    # --- 1. Chuẩn bị Dữ liệu - SỬA TRANSFORMS ---
-    data_transforms = {
-        'train': transforms.Compose([
-            transforms.Resize(config.IMAGE_SIZE),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(10),
-            # SỬA: Đặt ColorJitter trước ToTensor()
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
-            # SỬA: GaussianBlur cần kernel_size phù hợp với PIL
-            transforms.RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0))], p=0.1),
-            transforms.ToTensor(),  # Chuyển PIL -> Tensor ở đây
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            # SỬA: RandomErasing sau ToTensor() và Normalize
-            transforms.RandomErasing(p=0.05, scale=(0.02, 0.1)),
-        ]),
-        'val': transforms.Compose([
-            transforms.Resize(config.IMAGE_SIZE),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
-    }
+    # --- 1. Chuẩn bị Dữ liệu - SỬ DỤNG DEEPFAKE-SPECIFIC AUGMENTATION ---
+    print("\n--- 🎨 Đang thiết lập Data Augmentation ---")
+    
+    # Import từ module augmentation mới
+    from src.data_processing.deepfake_augmentation import (
+        get_deepfake_train_transforms, 
+        get_deepfake_val_transforms
+    )
+    
+    # Lấy USE_DEEPFAKE_AUGMENTATION từ config, mặc định là True nếu không có
+    use_deepfake_aug = getattr(config, 'USE_DEEPFAKE_AUGMENTATION', True)
+    
+    if use_deepfake_aug:
+        print("✅ Sử dụng Deepfake-specific Augmentation:")
+        print("   - JPEG Compression (mô phỏng compression artifacts)")
+        print("   - Gaussian Noise (mô phỏng camera chất lượng thấp)")
+        print("   - Adaptive Blur (mô phỏng video mất nét)")
+        print("   - Face Cutout (khuyến khích model học nhiều features)")
+        
+        data_transforms = {
+            'train': get_deepfake_train_transforms(
+                image_size=config.IMAGE_SIZE, 
+                use_deepfake_aug=True
+            ),
+            'val': get_deepfake_val_transforms(image_size=config.IMAGE_SIZE)
+        }
+    else:
+        print("⚠️ Sử dụng augmentation cơ bản (không có Deepfake-specific)")
+        from torchvision import transforms
+        data_transforms = {
+            'train': transforms.Compose([
+                transforms.Resize(config.IMAGE_SIZE),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(10),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
+                transforms.RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0))], p=0.1),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                transforms.RandomErasing(p=0.05, scale=(0.02, 0.1)),
+            ]),
+            'val': transforms.Compose([
+                transforms.Resize(config.IMAGE_SIZE),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+        }
 
     print("\n--- Đang tải dữ liệu ---")
     train_dir = os.path.join(config.PROCESSED_DATA_DIR, 'train')
@@ -155,33 +180,62 @@ def run_training():
     train_dataset = DeepfakeDataset(data_dir=train_dir, transform=data_transforms['train'])
     val_dataset = DeepfakeDataset(data_dir=val_dir, transform=data_transforms['val'])
 
+    # SỬA: Kiểm tra và áp dụng Oversampling cho train dataset
+    print("\n--- ⚖️ Đang thiết lập Data Balancing ---")
+    use_oversampling = getattr(config, 'USE_OVERSAMPLING', True)
+    
     # SỬA: Tối ưu DataLoader cho tốc độ (không ảnh hưởng model)
     pin_memory_setting = True if config.DEVICE == "cuda" else False
     prefetch_factor = getattr(config, 'PREFETCH_FACTOR', 2) if actual_workers > 0 else None
     
-    train_loader = DataLoader(
-        train_dataset, 
-        batch_size=config.BATCH_SIZE, 
-        shuffle=True, 
-        num_workers=actual_workers,  # Sử dụng actual_workers đã tính toán
-        pin_memory=pin_memory_setting,
-        persistent_workers=True if actual_workers > 0 else False,
-        prefetch_factor=prefetch_factor,  # THÊM: Prefetch để giảm idle time
-        drop_last=False     # Giữ nguyên để không mất data
-    )
+    if use_oversampling:
+        from src.training.balanced_dataset import get_balanced_dataloader
+        
+        oversampling_method = getattr(config, 'OVERSAMPLING_METHOD', 'oversampling')
+        oversample_ratio = getattr(config, 'OVERSAMPLE_RATIO', 1.3)
+        
+        print(f"✅ Sử dụng Data Balancing:")
+        print(f"   - Method: {oversampling_method}")
+        print(f"   - Oversample ratio: {oversample_ratio}")
+        
+        train_loader = get_balanced_dataloader(
+            train_dataset,
+            batch_size=config.BATCH_SIZE,
+            num_workers=actual_workers,
+            pin_memory=pin_memory_setting,
+            method=oversampling_method,
+            oversample_ratio=oversample_ratio
+        )
+    else:
+        print("⚠️ Không sử dụng oversampling (dùng class weights thay thế)")
+        train_loader = DataLoader(
+            train_dataset, 
+            batch_size=config.BATCH_SIZE, 
+            shuffle=True, 
+            num_workers=actual_workers,
+            pin_memory=pin_memory_setting,
+            persistent_workers=True if actual_workers > 0 else False,
+            prefetch_factor=prefetch_factor,
+            drop_last=False
+        )
+    
+    # Validation loader giữ nguyên (không cần oversampling)
     val_loader = DataLoader(
         val_dataset, 
         batch_size=config.BATCH_SIZE, 
         shuffle=False, 
-        num_workers=actual_workers,  # Sử dụng actual_workers
+        num_workers=actual_workers,
         pin_memory=pin_memory_setting,
         persistent_workers=True if actual_workers > 0 else False,
-        prefetch_factor=prefetch_factor   # THÊM: Prefetch cho validation
+        prefetch_factor=prefetch_factor
     )
     
-    print(f"Tập huấn luyện: {len(train_dataset)} mẫu")
-    print(f"Tập kiểm định: {len(val_dataset)} mẫu")
-    print(f"Số batch/epoch: {len(train_loader)} (train), {len(val_loader)} (val)")
+    print(f"\n📊 Kích thước dataset:")
+    print(f"   Tập huấn luyện: {len(train_dataset)} mẫu (gốc)")
+    if use_oversampling:
+        print(f"   Tập huấn luyện: {len(train_loader.dataset)} mẫu (sau oversampling)")
+    print(f"   Tập kiểm định: {len(val_dataset)} mẫu")
+    print(f"   Số batch/epoch: {len(train_loader)} (train), {len(val_loader)} (val)")
     
     # --- THÊM MỚI: Gradient Accumulation cho GPU nhỏ ---
     # Đọc accumulation_steps từ config

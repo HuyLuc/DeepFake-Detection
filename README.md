@@ -44,6 +44,10 @@ Dự án sử dụng dataset Deepfake Detection Challenge với các phương ph
 ## ✨ Tính năng
 
 - ✅ Phát hiện deepfake với độ chính xác cao
+- ✅ **Độ phân giải cao (380x380)** - Tối ưu cho EfficientNet-B4
+- ✅ **Deepfake-Specific Augmentation** - JPEG compression, Gaussian noise, blur, face cutout
+- ✅ **Data Balancing với Oversampling** - Giảm False Positive
+- ✅ **20 frames/video** - Tăng gấp đôi temporal coverage
 - ✅ Hỗ trợ nhiều định dạng video (MP4, AVI, MOV, MKV, WebM)
 - ✅ Giao diện web thân thiện với Flask
 - ✅ Tự động phát hiện và trích xuất khuôn mặt từ video
@@ -51,7 +55,7 @@ Dự án sử dụng dataset Deepfake Detection Challenge với các phương ph
 - ✅ Tối ưu hóa cho GPU nhỏ (2GB VRAM)
 - ✅ Logging và visualization training history
 - ✅ Early stopping và checkpoint management
-- ✅ Gradient accumulation cho batch size lớn
+- ✅ Mixed precision training
 
 ---
 
@@ -70,10 +74,12 @@ DeepFake-Detection/
 │
 ├── src/                             # Source code
 │   ├── data_processing/            # Tiền xử lý dữ liệu
-│   │   └── preprocess.py           # Trích xuất khuôn mặt từ video
+│   │   ├── preprocess.py           # Trích xuất khuôn mặt từ video
+│   │   └── deepfake_augmentation.py # Augmentation chuyên biệt cho Deepfake
 │   │
 │   ├── training/                   # Huấn luyện và đánh giá
 │   │   ├── dataset.py              # Custom Dataset class
+│   │   ├── balanced_dataset.py     # Dataset với oversampling
 │   │   ├── train.py                # Script huấn luyện
 │   │   └── evaluate.py             # Script đánh giá
 │   │
@@ -215,11 +221,23 @@ DATA_ROOT = os.path.join(BASE_DIR, 'data', 'all')
 ### Cấu hình huấn luyện
 ```python
 MODEL_NAME = 'efficientnet_b4'      # Mô hình sử dụng
-IMAGE_SIZE = (224, 224)              # Kích thước ảnh đầu vào
-NUM_EPOCHS = 5                       # Số epoch
-BATCH_SIZE = 4                       # Batch size (GPU) / 2 (CPU)
-LEARNING_RATE = 0.0005               # Learning rate
-ACCUMULATION_STEPS = 4               # Gradient accumulation
+IMAGE_SIZE = (380, 380)              # Kích thước ảnh đầu vào (tối ưu cho EfficientNet-B4)
+NUM_FRAMES_PER_VIDEO = 20            # Số frames lấy từ mỗi video
+NUM_EPOCHS = 10                      # Số epoch
+BATCH_SIZE = 8                       # Batch size (GPU) / 2 (CPU)
+LEARNING_RATE = 0.0001               # Learning rate
+WEIGHT_DECAY = 1e-4                  # L2 regularization
+
+# Data Augmentation
+USE_DEEPFAKE_AUGMENTATION = True     # Bật augmentation chuyên biệt
+ENABLE_COMPRESSION_AUG = True        # JPEG compression artifacts
+ENABLE_NOISE_AUG = True              # Gaussian noise
+ENABLE_BLUR_AUG = True               # Adaptive blur
+ENABLE_CUTOUT_AUG = True             # Face cutout
+
+# Data Balancing
+USE_OVERSAMPLING = True              # Bật oversampling
+OVERSAMPLE_RATIO = 1.3               # Tỷ lệ oversample cho lớp REAL
 ```
 
 ### Cấu hình ứng dụng web
@@ -246,9 +264,11 @@ python main.py preprocess
 **Quá trình này sẽ:**
 - Đọc video từ `data/all/`
 - Phát hiện và trích xuất khuôn mặt bằng MediaPipe
-- Lưu 10 frame/ảnh khuôn mặt cho mỗi video
+- **Lưu 20 frames/video** (uniform sampling - rải đều trên toàn bộ video)
 - Tự động chia train (80%), validation (10%), test (10%)
 - Lưu vào `processed_data/`
+
+**Lưu ý**: Nếu đã có dữ liệu cũ với 10 frames/video, cần xóa và chạy lại preprocessing để có 20 frames/video.
 
 **Thời gian**: Phụ thuộc vào số lượng video (có thể mất vài giờ)
 
@@ -260,16 +280,19 @@ python main.py train
 
 **Quá trình này sẽ:**
 - Tải EfficientNet-B4 pretrained
-- Fine-tune trên dataset đã xử lý
+- Áp dụng **Deepfake-specific augmentation** (compression, noise, blur, cutout)
+- Sử dụng **oversampling** để cân bằng dữ liệu
+- Fine-tune trên dataset đã xử lý với độ phân giải **380×380**
 - Tự động lưu checkpoint và best model
 - Ghi log vào `evaluation_results/training_log.csv`
 - Hỗ trợ resume từ checkpoint nếu bị gián đoạn
 
 **Tối ưu hóa:**
 - Tự động phát hiện GPU/CPU
-- Gradient accumulation cho batch size lớn
-- Early stopping khi không cải thiện
-- Mixed precision (có thể tắt trong config)
+- Mixed precision training (bắt buộc với resolution 380×380)
+- Early stopping khi không cải thiện (patience=2)
+- Gradient clipping để ổn định training
+- Class weights để xử lý imbalanced data
 
 ### Bước 3: Đánh giá mô hình
 
@@ -320,7 +343,7 @@ python reset_checkpoint.py --best-model --epoch 1
 
 **Quy trình:**
 1. Đọc video từ thư mục gốc
-2. Chọn ngẫu nhiên 30 frame
+2. **Uniform sampling: Lấy 20 frames rải đều trên toàn bộ video**
 3. Phát hiện khuôn mặt bằng MediaPipe
 4. Cắt và lưu khuôn mặt
 5. Phân loại REAL/FAKE dựa trên thư mục nguồn
@@ -329,6 +352,21 @@ python reset_checkpoint.py --best-model --epoch 1
 - Multiprocessing để xử lý song song
 - Tự động skip video đã xử lý
 - Memory-efficient cho máy yếu
+- Temporal padding cho video ngắn
+
+### 1.1. `src/data_processing/deepfake_augmentation.py`
+
+**Chức năng**: Augmentation chuyên biệt cho Deepfake Detection
+
+**Các lớp augmentation:**
+- `JPEGCompression`: Mô phỏng compression artifacts (p=0.5)
+- `AdaptiveGaussianNoise`: Thêm Gaussian noise (p=0.3)
+- `AdaptiveGaussianBlur`: Blur thích ứng (p=0.2)
+- `FaceCutout`: Random cutout trên khuôn mặt (p=0.3)
+
+**Utility functions:**
+- `get_deepfake_train_transforms()`: Transform pipeline cho training
+- `get_deepfake_val_transforms()`: Transform pipeline cho validation
 
 ### 2. `src/training/dataset.py`
 
@@ -340,15 +378,28 @@ python reset_checkpoint.py --best-model --epoch 1
 - Đảm bảo label khớp với ảnh
 - Hỗ trợ data augmentation
 
+### 2.1. `src/training/balanced_dataset.py`
+
+**Chức năng**: Dataset wrapper với oversampling
+
+**Tính năng:**
+- `OversampledDataset`: Wrapper dataset với oversampling cho lớp thiểu số
+- `create_weighted_sampler()`: Tạo WeightedRandomSampler
+- `get_balanced_dataloader()`: Tạo balanced DataLoader
+- Giảm False Positive rate bằng cách tăng số lượng mẫu REAL
+
 ### 3. `src/training/train.py`
 
 **Chức năng**: Huấn luyện mô hình
 
 **Tính năng:**
 - Tự động phát hiện và tối ưu hardware
+- **Deepfake-specific augmentation** (compression, noise, blur, cutout)
+- **Oversampling** để cân bằng dữ liệu
 - Class weights để xử lý imbalanced data
 - Gradient clipping để ổn định training
-- Early stopping
+- **Mixed precision training** (bắt buộc với resolution 380×380)
+- Early stopping (patience=2)
 - Checkpoint management
 - Logging chi tiết
 
@@ -499,11 +550,19 @@ python reset_checkpoint.py --epoch 1
 
 ### Tối ưu hóa cho GPU nhỏ (2GB VRAM)
 
-- Batch size: 4
-- Gradient accumulation: 4 (effective batch = 16)
-- Mixed precision: Tắt (để tránh NaN)
-- Gradient clipping: Bật
-- Prefetch factor: 2
+- **Image size**: 380×380 (tối ưu cho EfficientNet-B4)
+- **Batch size**: 8 (GPU) / 2 (CPU)
+- **Mixed precision**: Bắt buộc (giảm VRAM usage ~40%)
+- **Gradient clipping**: Bật (ổn định training)
+- **Prefetch factor**: 2
+- **NUM_WORKERS**: 4 (GPU) / 0 (CPU)
+
+### Data Processing
+
+- **Frames/video**: 20 (tăng gấp đôi so với trước)
+- **Sampling method**: Uniform sampling (rải đều trên toàn bộ video)
+- **Augmentation**: Deepfake-specific (compression, noise, blur, cutout)
+- **Data balancing**: Oversampling (ratio=1.3 cho lớp REAL)
 
 ### Tự động điều chỉnh
 
