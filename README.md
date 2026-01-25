@@ -1,61 +1,97 @@
-# DeepFake Detection Project
+# 🔍 DeepFake Detection Project
 
-Dự án phát hiện Deepfake sử dụng Deep Learning với mô hình EfficientNet-B4. Hệ thống có khả năng phân loại video thành hai lớp: **REAL** (thật) và **FAKE** (giả mạo) thông qua việc phân tích các frame khuôn mặt được trích xuất từ video
+Dự án phát hiện Deepfake sử dụng Deep Learning với **2 kiến trúc** model khác nhau:
+- 🔵 **Standard**: EfficientNet-B4 (nhanh, nhẹ)
+- 🟢 **Advanced**: EfficientNet + LSTM + Swin Transformer (độ chính xác cao)
+
+Hệ thống phân loại video thành **REAL** (thật) và **FAKE** (giả mạo) thông qua việc phân tích các frame khuôn mặt.
 
 ---
 
 ## 📋 Mục lục
 
-1. [Giới thiệu](#giới-thiệu)
-2. [Tính năng](#tính-năng)
-3. [Cấu trúc dự án](#cấu-trúc-dự-án)
-4. [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-5. [Cài đặt](#cài-đặt)
-6. [Cấu hình](#cấu-hình)
-7. [Hướng dẫn sử dụng](#hướng-dẫn-sử-dụng)
-8. [Mô tả các module](#mô-tả-các-module)
-9. [Kết quả và đánh giá](#kết-quả-và-đánh-giá)
-10. [Troubleshooting](#troubleshooting)
-11. [Tác giả và License](#tác-giả-và-license)
-
----
-
-## 🎯 Giới thiệu
-
-Dự án này sử dụng mô hình **EfficientNet-B4** (từ thư viện `timm`) để phát hiện video deepfake. Quy trình bao gồm:
-
-1. **Tiền xử lý**: Trích xuất khuôn mặt từ video sử dụng MediaPipe
-2. **Huấn luyện**: Fine-tune mô hình EfficientNet-B4 trên dataset Deepfake
-3. **Đánh giá**: Kiểm tra hiệu suất trên tập test
-4. **Ứng dụng Web**: Giao diện Flask để người dùng upload và kiểm tra video
-
-### Dataset
-
-Dự án sử dụng dataset Deepfake Detection Challenge với các phương pháp giả mạo:
-- **Deepfakes**
-- **Face2Face**
-- **FaceSwap**
-- **NeuralTextures**
-- **DeepFakeDetection**
-- **FaceShifter**
+1. [Tính năng](#-tính-năng)
+2. [2 Kiến trúc Model](#-2-kiến-trúc-model)
+3. [Cấu trúc dự án](#-cấu-trúc-dự-án)
+4. [Yêu cầu hệ thống](#-yêu-cầu-hệ-thống)
+5. [Cài đặt](#-cài-đặt)
+6. [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
+7. [Cấu hình chi tiết](#-cấu-hình-chi-tiết)
+8. [Troubleshooting](#-troubleshooting)
 
 ---
 
 ## ✨ Tính năng
 
-- ✅ Phát hiện deepfake với độ chính xác cao
-- ✅ **Độ phân giải cao (380x380)** - Tối ưu cho EfficientNet-B4
-- ✅ **Deepfake-Specific Augmentation** - JPEG compression, Gaussian noise, blur, face cutout
-- ✅ **Data Balancing với Oversampling** - Giảm False Positive
-- ✅ **20 frames/video** - Tăng gấp đôi temporal coverage
+### Core Features
+- ✅ Phát hiện deepfake với độ chính xác cao (~95%)
+- ✅ **2 kiến trúc model** để lựa chọn theo nhu cầu
 - ✅ Hỗ trợ nhiều định dạng video (MP4, AVI, MOV, MKV, WebM)
-- ✅ Giao diện web thân thiện với Flask
-- ✅ Tự động phát hiện và trích xuất khuôn mặt từ video
-- ✅ Hỗ trợ GPU và CPU
-- ✅ Tối ưu hóa cho GPU nhỏ (2GB VRAM)
-- ✅ Logging và visualization training history
-- ✅ Early stopping và checkpoint management
+- ✅ Giao diện web Flask thân thiện
+
+### Technical Features
+- ✅ **Độ phân giải 380×380** - Tối ưu cho EfficientNet-B4
+- ✅ **20 frames/video** - Uniform sampling
+- ✅ **Deepfake-Specific Augmentation** (JPEG compression, noise, blur, cutout)
+- ✅ **Oversampling** để cân bằng dữ liệu
+- ✅ **LSTM/GRU** để học temporal patterns (flickering)
+- ✅ **Ensemble** EfficientNet + Swin Transformer
 - ✅ Mixed precision training
+- ✅ Early stopping & checkpoint management
+
+---
+
+## 🏗️ 2 Kiến trúc Model
+
+### 🔵 Kiến trúc 1: Standard
+
+| Đặc điểm | Giá trị |
+|----------|---------|
+| **Model** | EfficientNet-B4 |
+| **Input** | Từng frame độc lập |
+| **VRAM tối thiểu** | 2GB |
+| **Accuracy** | ~90% |
+| **Thời gian/epoch** | ~10 phút |
+| **Phù hợp** | GPU yếu, training nhanh |
+
+**Cách dùng:**
+```bash
+python main.py train
+```
+
+### 🟢 Kiến trúc 2: Advanced
+
+| Đặc điểm | Giá trị |
+|----------|---------|
+| **Model** | EfficientNet + LSTM + Swin Transformer |
+| **Input** | Sequence 10 frames |
+| **VRAM tối thiểu** | 8GB (khuyến nghị 16GB) |
+| **Accuracy** | ~95% |
+| **Thời gian/epoch** | ~25 phút |
+| **Phù hợp** | GPU mạnh (T4, V100), cần accuracy cao |
+
+**Cách dùng:**
+```bash
+# Temporal only (EfficientNet + LSTM)
+python main.py train_advanced --model temporal
+
+# Ensemble only (EfficientNet + Swin)
+python main.py train_advanced --model ensemble
+
+# Full power - KHUYẾN NGHỊ
+python main.py train_advanced --model temporal_ensemble --epochs 15
+```
+
+### So sánh 2 kiến trúc
+
+| | 🔵 Standard | 🟢 Advanced |
+|---|---|---|
+| Backbone | EfficientNet-B4 | EfficientNet + Swin |
+| Temporal Learning | ❌ | ✅ LSTM |
+| Phát hiện Flickering | ❌ | ✅ |
+| Global Structure | ❌ | ✅ Transformer |
+| Accuracy | ~90% | ~95% |
+| VRAM | 2GB+ | 8GB+ |
 
 ---
 
@@ -64,78 +100,61 @@ Dự án sử dụng dataset Deepfake Detection Challenge với các phương ph
 ```
 DeepFake-Detection/
 │
-├── main.py                          # Entry point chính
-├── requirements.txt                  # Danh sách dependencies
-├── README.md                        # Tài liệu dự án
-├── .gitignore                       # Git ignore rules
+├── main.py                               # 🚀 Entry point chính
+├── requirements.txt                       # Dependencies
+├── README.md                              # Tài liệu này
 │
-├── configs/                         # Cấu hình
-│   └── config.py                    # File cấu hình chính
+├── configs/
+│   └── config.py                          # Cấu hình chung
 │
-├── src/                             # Source code
-│   ├── data_processing/            # Tiền xử lý dữ liệu
-│   │   ├── preprocess.py           # Trích xuất khuôn mặt từ video
-│   │   └── deepfake_augmentation.py # Augmentation chuyên biệt cho Deepfake
+├── src/
+│   ├── architectures/                     # 🏗️ CÁC KIẾN TRÚC MODEL
+│   │   │
+│   │   ├── 🔵 standard/                   # Kiến trúc 1: EfficientNet
+│   │   │   ├── model.py                   # Model factory
+│   │   │   ├── dataset.py                 # Dataset (frame độc lập)
+│   │   │   └── train.py                   # Training script
+│   │   │
+│   │   ├── 🟢 advanced/                   # Kiến trúc 2: Temporal + Ensemble
+│   │   │   ├── temporal_model.py          # EfficientNet + LSTM
+│   │   │   ├── ensemble_model.py          # EfficientNet + Swin
+│   │   │   ├── temporal_dataset.py        # Dataset (sequences)
+│   │   │   └── train.py                   # Training script
+│   │   │
+│   │   └── evaluate.py                    # Script đánh giá (chung)
 │   │
-│   ├── training/                   # Huấn luyện và đánh giá
-│   │   ├── dataset.py              # Custom Dataset class
-│   │   ├── balanced_dataset.py     # Dataset với oversampling
-│   │   ├── train.py                # Script huấn luyện
-│   │   └── evaluate.py             # Script đánh giá
+│   ├── data_processing/                   # 📊 TIỀN XỬ LÝ
+│   │   ├── preprocess.py                  # Trích xuất khuôn mặt
+│   │   └── deepfake_augmentation.py       # Data augmentation
 │   │
-│   ├── app/                        # Ứng dụng web
-│   │   ├── main_app.py             # Flask application
-│   │   └── templates/
-│   │       └── index.html          # Giao diện web
+│   ├── app/                               # 🌐 WEB APP
+│   │   ├── main_app.py                    # Flask application
+│   │   └── templates/index.html
 │   │
-│   └── utils/                      # Tiện ích
-│       └── utils.py                # Helper functions
+│   └── utils/                             # 🔧 TIỆN ÍCH
+│       ├── utils.py                       # Helper functions
+│       └── balanced_dataset.py            # Oversampling
 │
-├── data/                            # Dữ liệu gốc (không commit)
-│   └── all/
-│       ├── original_sequences/     # Video thật
-│       └── manipulated_sequences/  # Video giả mạo
-│
-├── processed_data/                  # Dữ liệu đã xử lý (không commit)
-│   ├── train/
-│   │   ├── REAL/                   # Frame khuôn mặt thật (train)
-│   │   └── FAKE/                   # Frame khuôn mặt giả (train)
-│   ├── val/                        # Validation set
-│   └── test/                       # Test set
-│
-├── saved_models/                   # Model đã lưu (không commit)
-│   ├── checkpoint.pth.tar         # Checkpoint hiện tại
-│   └── model_best.pth.tar          # Model tốt nhất
-│
-├── evaluation_results/             # Kết quả đánh giá (không commit)
-│   ├── training_log.csv           # Log training
-│   ├── training_history.png        # Biểu đồ training
-│   ├── confusion_matrix.png       # Ma trận nhầm lẫn
-│   ├── classification_report.txt   # Báo cáo phân loại
-│   ├── training.log                # Log file
-│   └── evaluation.log              # Log evaluation
-│
-├── reset_checkpoint.py             # Script reset checkpoint
-├── visualize_training.py           # Script visualization
-└── .venv/                          # Virtual environment (không commit)
+├── data/all/                              # Dữ liệu gốc (không commit)
+├── processed_data/                        # Dữ liệu đã xử lý
+├── saved_models/                          # Models đã train
+└── evaluation_results/                    # Kết quả đánh giá
 ```
 
 ---
 
 ## 💻 Yêu cầu hệ thống
 
-### Phần cứng tối thiểu
-- **CPU**: Bất kỳ CPU hiện đại nào
-- **RAM**: Tối thiểu 8GB (khuyến nghị 16GB)
-- **GPU**: Không bắt buộc, nhưng khuyến nghị:
-  - NVIDIA GPU với CUDA support
-  - Tối thiểu 2GB VRAM (đã tối ưu cho GPU nhỏ)
-  - Khuyến nghị: 4GB+ VRAM cho hiệu suất tốt hơn
+### Cho kiến trúc Standard (🔵)
+- **GPU**: Tối thiểu 2GB VRAM (hoặc CPU)
+- **RAM**: 8GB+
+- **Python**: 3.8+
 
-### Phần mềm
-- **Python**: 3.7 trở lên
-- **CUDA**: 11.0+ (nếu sử dụng GPU)
-- **cuDNN**: 8.0+ (nếu sử dụng GPU)
+### Cho kiến trúc Advanced (🟢)
+- **GPU**: Tối thiểu 8GB VRAM (khuyến nghị 16GB)
+- **RAM**: 16GB+
+- **Python**: 3.8+
+- **Khuyến nghị**: Google Colab với GPU T4/V100
 
 ---
 
@@ -148,40 +167,17 @@ git clone https://github.com/HuyLuc/DeepFake-Detection.git
 cd DeepFake-Detection
 ```
 
-### 2. Kích hoạt virtual environment
+### 2. Tạo môi trường ảo
 
-**Nếu bạn đã có môi trường ảo `.venv`:**
-
-**Windows PowerShell:**
 ```bash
-.venv\Scripts\Activate.ps1
-```
-
-**Windows CMD:**
-```bash
-.venv\Scripts\activate.bat
-```
-
-**Linux/Mac:**
-```bash
-source .venv/bin/activate
-```
-
-**Nếu chưa có môi trường ảo, tạo mới:**
-
-**Windows:**
-```bash
+# Windows
 python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
+.venv\Scripts\activate
 
-**Linux/Mac:**
-```bash
+# Linux/Mac
 python3 -m venv .venv
 source .venv/bin/activate
 ```
-
-**Lưu ý**: Bạn chỉ cần **một** môi trường ảo cho dự án. Nếu đã có `.venv`, chỉ cần kích hoạt nó, không cần tạo mới. `.venv` sẽ được ẩn khỏi VS Code Source Control.
 
 ### 3. Cài đặt dependencies
 
@@ -189,65 +185,19 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Cấu hình dữ liệu
+### 4. Chuẩn bị dữ liệu
 
-Đảm bảo cấu trúc dữ liệu như sau:
+Đặt video vào thư mục theo cấu trúc:
 ```
-data/
-└── all/
-    ├── original_sequences/
-    │   ├── youtube/c23/videos/
-    │   └── actors/c23/videos/
-    └── manipulated_sequences/
-        ├── Deepfakes/c23/videos/
-        ├── Face2Face/c23/videos/
-        ├── FaceSwap/c23/videos/
-        ├── NeuralTextures/c23/videos/
-        ├── DeepFakeDetection/c23/videos/
-        └── FaceShifter/c23/videos/
+data/all/
+├── original_sequences/
+│   └── youtube/c23/videos/     # Video thật
+└── manipulated_sequences/
+    ├── Deepfakes/c23/videos/   # Video fake
+    ├── Face2Face/c23/videos/
+    ├── FaceSwap/c23/videos/
+    └── NeuralTextures/c23/videos/
 ```
-
----
-
-## ⚙️ Cấu hình
-
-Tất cả cấu hình được quản lý trong file `configs/config.py`. Các tham số quan trọng:
-
-### Đường dẫn dữ liệu
-```python
-DATA_ROOT = os.path.join(BASE_DIR, 'data', 'all')
-```
-
-### Cấu hình huấn luyện
-```python
-MODEL_NAME = 'efficientnet_b4'      # Mô hình sử dụng
-IMAGE_SIZE = (380, 380)              # Kích thước ảnh đầu vào (tối ưu cho EfficientNet-B4)
-NUM_FRAMES_PER_VIDEO = 20            # Số frames lấy từ mỗi video
-NUM_EPOCHS = 10                      # Số epoch
-BATCH_SIZE = 8                       # Batch size (GPU) / 2 (CPU)
-LEARNING_RATE = 0.0001               # Learning rate
-WEIGHT_DECAY = 1e-4                  # L2 regularization
-
-# Data Augmentation
-USE_DEEPFAKE_AUGMENTATION = True     # Bật augmentation chuyên biệt
-ENABLE_COMPRESSION_AUG = True        # JPEG compression artifacts
-ENABLE_NOISE_AUG = True              # Gaussian noise
-ENABLE_BLUR_AUG = True               # Adaptive blur
-ENABLE_CUTOUT_AUG = True             # Face cutout
-
-# Data Balancing
-USE_OVERSAMPLING = True              # Bật oversampling
-OVERSAMPLE_RATIO = 1.3               # Tỷ lệ oversample cho lớp REAL
-```
-
-### Cấu hình ứng dụng web
-```python
-EVIDENCE_THRESHOLD = 0.80            # Ngưỡng phát hiện fake
-MAX_VIDEO_SIZE_MB = 500              # Kích thước video tối đa
-ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
-```
-
-**Lưu ý**: Đường dẫn sẽ tự động điều chỉnh theo vị trí dự án, không cần chỉnh sửa thủ công.
 
 ---
 
@@ -255,357 +205,182 @@ ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
 
 ### Bước 1: Tiền xử lý dữ liệu
 
-Trích xuất khuôn mặt từ video và chia thành train/val/test:
-
 ```bash
 python main.py preprocess
 ```
 
 **Quá trình này sẽ:**
 - Đọc video từ `data/all/`
-- Phát hiện và trích xuất khuôn mặt bằng MediaPipe
-- **Lưu 20 frames/video** (uniform sampling - rải đều trên toàn bộ video)
-- Tự động chia train (80%), validation (10%), test (10%)
-- Lưu vào `processed_data/`
+- Trích xuất 20 frames/video (uniform sampling)
+- Phát hiện và crop khuôn mặt
+- Lưu vào `processed_data/train/`, `val/`, `test/`
 
-**Lưu ý**: Nếu đã có dữ liệu cũ với 10 frames/video, cần xóa và chạy lại preprocessing để có 20 frames/video.
+### Bước 2: Chọn kiến trúc và Training
 
-**Thời gian**: Phụ thuộc vào số lượng video (có thể mất vài giờ)
-
-### Bước 2: Huấn luyện mô hình
+#### Option A: 🔵 Standard (nhanh, GPU yếu)
 
 ```bash
 python main.py train
 ```
 
-**Quá trình này sẽ:**
-- Tải EfficientNet-B4 pretrained
-- Áp dụng **Deepfake-specific augmentation** (compression, noise, blur, cutout)
-- Sử dụng **oversampling** để cân bằng dữ liệu
-- Fine-tune trên dataset đã xử lý với độ phân giải **380×380**
-- Tự động lưu checkpoint và best model
-- Ghi log vào `evaluation_results/training_log.csv`
-- Hỗ trợ resume từ checkpoint nếu bị gián đoạn
+#### Option B: 🟢 Advanced (chính xác, GPU mạnh)
 
-**Tối ưu hóa:**
-- Tự động phát hiện GPU/CPU
-- Mixed precision training (bắt buộc với resolution 380×380)
-- Early stopping khi không cải thiện (patience=2)
-- Gradient clipping để ổn định training
-- Class weights để xử lý imbalanced data
+```bash
+# Khuyến nghị - Dùng trên Google Colab với GPU T4
+python main.py train_advanced --model temporal_ensemble --epochs 15 --batch-size 8
+```
 
-### Bước 3: Đánh giá mô hình
+**Các tham số cho `train_advanced`:**
+
+| Tham số | Mặc định | Mô tả |
+|---------|----------|-------|
+| `--model` | `temporal_ensemble` | Loại model: `temporal`, `ensemble`, `temporal_ensemble`, `lightweight` |
+| `--seq-len` | `10` | Số frames mỗi sequence |
+| `--epochs` | `10` | Số epochs |
+| `--batch-size` | `8` | Batch size |
+| `--lr` | `0.0001` | Learning rate |
+| `--resume` | `None` | Path checkpoint để resume |
+
+### Bước 3: Đánh giá
 
 ```bash
 python main.py evaluate
 ```
 
-**Kết quả sẽ được lưu tại:**
-- `evaluation_results/classification_report.txt`: Báo cáo chi tiết
-- `evaluation_results/confusion_matrix.png`: Ma trận nhầm lẫn
-- `evaluation_results/evaluation.log`: Log file
+Kết quả lưu tại:
+- `evaluation_results/classification_report.txt`
+- `evaluation_results/confusion_matrix.png`
 
-### Bước 4: Chạy ứng dụng web
+### Bước 4: Chạy Web App
 
 ```bash
 python main.py app
 ```
 
-Sau đó mở trình duyệt và truy cập: `http://localhost:5000`
-
-**Tính năng:**
-- Upload video để kiểm tra
-- Tự động phát hiện khuôn mặt
-- Hiển thị kết quả với độ tin cậy
-- Hỗ trợ nhiều định dạng video
-
-### Các công cụ hỗ trợ
-
-**Visualize training history:**
-```bash
-python visualize_training.py
-```
-
-**Reset checkpoint:**
-```bash
-python reset_checkpoint.py --epoch 1 --val-acc 0.96
-# Hoặc reset model_best
-python reset_checkpoint.py --best-model --epoch 1
-```
+Mở trình duyệt: `http://localhost:5000`
 
 ---
 
-## 📦 Mô tả các module
+## ⚙️ Cấu hình chi tiết
 
-### 1. `src/data_processing/preprocess.py`
+File: `configs/config.py`
 
-**Chức năng**: Trích xuất khuôn mặt từ video
+### Cấu hình chung
+```python
+IMAGE_SIZE = (380, 380)              # Độ phân giải ảnh
+NUM_FRAMES_PER_VIDEO = 20            # Frames lấy từ mỗi video
+BATCH_SIZE = 8                       # Batch size
+NUM_EPOCHS = 10                      # Số epochs
+LEARNING_RATE = 0.0001               # Learning rate
+```
 
-**Quy trình:**
-1. Đọc video từ thư mục gốc
-2. **Uniform sampling: Lấy 20 frames rải đều trên toàn bộ video**
-3. Phát hiện khuôn mặt bằng MediaPipe
-4. Cắt và lưu khuôn mặt
-5. Phân loại REAL/FAKE dựa trên thư mục nguồn
+### Data Augmentation
+```python
+USE_DEEPFAKE_AUGMENTATION = True     # Bật augmentation chuyên biệt
+ENABLE_COMPRESSION_AUG = True        # JPEG compression
+ENABLE_NOISE_AUG = True              # Gaussian noise
+ENABLE_BLUR_AUG = True               # Adaptive blur
+ENABLE_CUTOUT_AUG = True             # Face cutout
+```
 
-**Tối ưu:**
-- Multiprocessing để xử lý song song
-- Tự động skip video đã xử lý
-- Memory-efficient cho máy yếu
-- Temporal padding cho video ngắn
-
-### 1.1. `src/data_processing/deepfake_augmentation.py`
-
-**Chức năng**: Augmentation chuyên biệt cho Deepfake Detection
-
-**Các lớp augmentation:**
-- `JPEGCompression`: Mô phỏng compression artifacts (p=0.5)
-- `AdaptiveGaussianNoise`: Thêm Gaussian noise (p=0.3)
-- `AdaptiveGaussianBlur`: Blur thích ứng (p=0.2)
-- `FaceCutout`: Random cutout trên khuôn mặt (p=0.3)
-
-**Utility functions:**
-- `get_deepfake_train_transforms()`: Transform pipeline cho training
-- `get_deepfake_val_transforms()`: Transform pipeline cho validation
-
-### 2. `src/training/dataset.py`
-
-**Chức năng**: Custom PyTorch Dataset
-
-**Tính năng:**
-- Tự động load ảnh từ thư mục
-- Xử lý lỗi khi ảnh bị hỏng
-- Đảm bảo label khớp với ảnh
-- Hỗ trợ data augmentation
-
-### 2.1. `src/training/balanced_dataset.py`
-
-**Chức năng**: Dataset wrapper với oversampling
-
-**Tính năng:**
-- `OversampledDataset`: Wrapper dataset với oversampling cho lớp thiểu số
-- `create_weighted_sampler()`: Tạo WeightedRandomSampler
-- `get_balanced_dataloader()`: Tạo balanced DataLoader
-- Giảm False Positive rate bằng cách tăng số lượng mẫu REAL
-
-### 3. `src/training/train.py`
-
-**Chức năng**: Huấn luyện mô hình
-
-**Tính năng:**
-- Tự động phát hiện và tối ưu hardware
-- **Deepfake-specific augmentation** (compression, noise, blur, cutout)
-- **Oversampling** để cân bằng dữ liệu
-- Class weights để xử lý imbalanced data
-- Gradient clipping để ổn định training
-- **Mixed precision training** (bắt buộc với resolution 380×380)
-- Early stopping (patience=2)
-- Checkpoint management
-- Logging chi tiết
-
-### 4. `src/training/evaluate.py`
-
-**Chức năng**: Đánh giá mô hình trên test set
-
-**Output:**
-- Accuracy
-- Precision, Recall, F1-score
-- Confusion matrix
-- Classification report
-
-### 5. `src/app/main_app.py`
-
-**Chức năng**: Flask web application
-
-**API Endpoints:**
-- `GET /`: Trang chủ
-- `POST /predict_video`: Upload và phân tích video
-
-**Tính năng:**
-- Validation file upload
-- Tự động phát hiện khuôn mặt
-- Xử lý video frame-by-frame
-- Trả về kết quả với độ tin cậy
-
-### 6. `src/utils/utils.py`
-
-**Chức năng**: Helper functions
-
-**Các hàm:**
-- `save_checkpoint()`: Lưu checkpoint
-- `load_checkpoint()`: Tải checkpoint với error handling
-- `verify_data_structure()`: Kiểm tra cấu trúc dữ liệu
-
----
-
-## 📊 Kết quả và đánh giá
-
-### Metrics
-
-Sau khi chạy evaluation, bạn sẽ nhận được:
-
-- **Accuracy**: Độ chính xác tổng thể
-- **Precision**: Độ chính xác cho từng lớp
-- **Recall**: Độ nhạy cho từng lớp
-- **F1-score**: Harmonic mean của Precision và Recall
-
-### Visualization
-
-Chạy `visualize_training.py` để xem:
-- Training/Validation loss curves
-- Training/Validation accuracy curves
-- Learning rate schedule
-- Combined metrics
-
-### Checkpoint Management
-
-- `checkpoint.pth.tar`: Checkpoint hiện tại (để resume)
-- `model_best.pth.tar`: Model tốt nhất (để inference)
+### Data Balancing
+```python
+USE_OVERSAMPLING = True              # Bật oversampling
+OVERSAMPLE_RATIO = 1.3               # Tỷ lệ oversample lớp REAL
+```
 
 ---
 
 ## 🔍 Troubleshooting
 
-### Lỗi: "Unable to write new index file"
+### Lỗi: CUDA out of memory
 
-**Nguyên nhân**: File Git index bị lock hoặc không có quyền
+**Nguyên nhân:** GPU không đủ VRAM
 
-**Giải pháp**:
-```powershell
-# Windows (chạy PowerShell với quyền Admin)
-icacls .git /grant Everyone:F /T
-git add -A
+**Giải pháp:**
+```python
+# Trong config.py, giảm BATCH_SIZE
+BATCH_SIZE = 4  # hoặc 2
+
+# Hoặc chuyển sang kiến trúc Standard
+python main.py train  # thay vì train_advanced
 ```
 
-### Lỗi: "CUDA out of memory"
+### Lỗi: Module not found
 
-**Nguyên nhân**: Batch size quá lớn cho GPU
-
-**Giải pháp**: Giảm `BATCH_SIZE` trong `configs/config.py` hoặc tăng `ACCUMULATION_STEPS`
-
-### Lỗi: "No module named 'configs'"
-
-**Nguyên nhân**: Chưa cài đặt đúng hoặc chạy từ thư mục sai
-
-**Giải pháp**: Đảm bảo chạy từ thư mục gốc của dự án:
+**Giải pháp:**
 ```bash
+# Đảm bảo chạy từ thư mục gốc
 cd DeepFake-Detection
 python main.py <task>
 ```
 
-### Lỗi: "Không tìm thấy video gốc"
+### Training quá chậm
 
-**Nguyên nhân**: Cấu trúc dữ liệu không đúng
+**Giải pháp:**
+```python
+# Giảm số workers trong config.py
+NUM_WORKERS = 0  # Dùng cho máy yếu
 
-**Giải pháp**: Kiểm tra lại cấu trúc thư mục trong `data/all/` theo mô tả ở phần [Cài đặt](#cài-đặt)
+# Hoặc tắt một số augmentation
+ENABLE_COMPRESSION_AUG = False
+```
 
-### Video không phát hiện được khuôn mặt
+### Không tìm thấy GPU
 
-**Nguyên nhân**: 
-- Video không có khuôn mặt
-- Chất lượng video quá thấp
-- Khuôn mặt quá nhỏ hoặc bị che khuất
+```bash
+# Kiểm tra CUDA
+python -c "import torch; print(torch.cuda.is_available())"
 
-**Giải pháp**: Thử video khác với khuôn mặt rõ ràng hơn
+# Nếu False, cài lại PyTorch với CUDA
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```
 
 ---
 
-## 📝 Các lệnh nhanh
+## 📊 Kết quả mong đợi
 
-```bash
-# Tiền xử lý
-python main.py preprocess
-
-# Huấn luyện
-python main.py train
-
-# Đánh giá
-python main.py evaluate
-
-# Chạy web app
-python main.py app
-
-# Xem training history
-python visualize_training.py
-
-# Reset checkpoint về epoch 1
-python reset_checkpoint.py --epoch 1
-```
+| Kiến trúc | Train Acc | Val Acc | Test Acc |
+|-----------|-----------|---------|----------|
+| 🔵 Standard | ~95% | ~90% | ~88-90% |
+| 🟢 Advanced | ~97% | ~95% | ~93-95% |
 
 ---
 
 ## 🛠️ Công nghệ sử dụng
 
-- **PyTorch**: Deep learning framework
-- **timm**: Pretrained models (EfficientNet-B4)
-- **MediaPipe**: Face detection
-- **Flask**: Web framework
-- **OpenCV**: Video processing
-- **scikit-learn**: Metrics và evaluation
-- **Pandas, Matplotlib, Seaborn**: Data visualization
+- **PyTorch** - Deep learning framework
+- **timm** - Pretrained models (EfficientNet, Swin)
+- **MediaPipe** - Face detection
+- **Flask** - Web framework
+- **OpenCV** - Video processing
+- **scikit-learn** - Metrics
 
 ---
 
-## 📈 Hiệu suất
+## 👤 Tác giả
 
-### Tối ưu hóa cho GPU nhỏ (2GB VRAM)
-
-- **Image size**: 380×380 (tối ưu cho EfficientNet-B4)
-- **Batch size**: 8 (GPU) / 2 (CPU)
-- **Mixed precision**: Bắt buộc (giảm VRAM usage ~40%)
-- **Gradient clipping**: Bật (ổn định training)
-- **Prefetch factor**: 2
-- **NUM_WORKERS**: 4 (GPU) / 0 (CPU)
-
-### Data Processing
-
-- **Frames/video**: 20 (tăng gấp đôi so với trước)
-- **Sampling method**: Uniform sampling (rải đều trên toàn bộ video)
-- **Augmentation**: Deepfake-specific (compression, noise, blur, cutout)
-- **Data balancing**: Oversampling (ratio=1.3 cho lớp REAL)
-
-### Tự động điều chỉnh
-
-Hệ thống tự động:
-- Phát hiện GPU/CPU
-- Điều chỉnh batch size theo VRAM
-- Điều chỉnh số workers theo RAM
-- Tối ưu data loading
-
----
-
-## 👤 Tác giả và License
-
-**Tác giả**: HuyLuc
-
-**License**: Xem file LICENSE (nếu có)
+**HuyLuc**
 
 ---
 
 ## 📚 Tài liệu tham khảo
 
 - [EfficientNet Paper](https://arxiv.org/abs/1905.11946)
+- [Swin Transformer Paper](https://arxiv.org/abs/2103.14030)
 - [Deepfake Detection Challenge](https://www.kaggle.com/c/deepfake-detection-challenge)
 - [PyTorch Documentation](https://pytorch.org/docs/)
-- [MediaPipe Face Detection](https://google.github.io/mediapipe/solutions/face_detection.html)
 
 ---
 
 ## 🤝 Đóng góp
 
-Mọi đóng góp đều được chào đón! Vui lòng:
 1. Fork dự án
 2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
 4. Push to branch (`git push origin feature/AmazingFeature`)
 5. Mở Pull Request
 
 ---
 
-## 📧 Liên hệ
-
-Nếu có câu hỏi hoặc vấn đề, vui lòng mở issue trên GitHub.
-
----
-
-**Lưu ý**: Đây là dự án nghiên cứu và giáo dục. Kết quả có thể khác nhau tùy thuộc vào dataset và cấu hình.
+**Lưu ý:** Đây là dự án nghiên cứu và giáo dục. Kết quả có thể khác nhau tùy thuộc vào dataset và cấu hình phần cứng.

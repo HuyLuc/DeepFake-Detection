@@ -1,4 +1,8 @@
-# src/training/train.py (phiên bản cuối cùng với Logging và Class Weights)
+# src/architectures/standard/train.py
+"""
+🔵 STANDARD ARCHITECTURE - Training Script
+EfficientNet-B4 đơn giản, phân loại từng frame độc lập.
+"""
 
 import torch
 import torch.nn as nn
@@ -9,15 +13,15 @@ from tqdm import tqdm
 import timm
 import os
 import csv
-import glob # --- THÊM MỚI: Thư viện để tìm kiếm file
-from torch.amp import autocast, GradScaler  # --- THÊM MỚI: Mixed precision (API mới)
-import psutil  # --- THÊM MỚI: Monitoring system resources
-import gc      # --- THÊM MỚI: Garbage collection
+import glob
+from torch.amp import autocast, GradScaler
+import psutil
+import gc
 import logging
 
 # Import từ các file khác trong dự án
 from configs import config
-from src.training.dataset import DeepfakeDataset
+from .dataset import DeepfakeDataset  # Import từ cùng thư mục
 from src.utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
 
 # Thiết lập logging với UTF-8 encoding để tránh lỗi Unicode trên Windows
@@ -189,7 +193,7 @@ def run_training():
     prefetch_factor = getattr(config, 'PREFETCH_FACTOR', 2) if actual_workers > 0 else None
     
     if use_oversampling:
-        from src.training.balanced_dataset import get_balanced_dataloader
+        from src.utils.balanced_dataset import get_balanced_dataloader
         
         oversampling_method = getattr(config, 'OVERSAMPLING_METHOD', 'oversampling')
         oversample_ratio = getattr(config, 'OVERSAMPLE_RATIO', 1.3)

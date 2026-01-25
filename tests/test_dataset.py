@@ -1,5 +1,5 @@
 """
-Unit tests cho src/training/dataset.py
+Unit tests cho src/architectures/standard/dataset.py
 """
 
 import unittest
@@ -12,7 +12,7 @@ import numpy as np
 # Import các hàm cần test
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.training.dataset import DeepfakeDataset
+from src.architectures.standard.dataset import DeepfakeDataset
 
 
 class TestDeepfakeDataset(unittest.TestCase):

@@ -1,4 +1,8 @@
-# src/training/evaluate.py
+# src/architectures/evaluate.py
+"""
+Script đánh giá mô hình trên tập test.
+Dùng chung cho cả Standard và Advanced architectures.
+"""
 
 import torch
 from torch.utils.data import DataLoader
@@ -13,7 +17,7 @@ import logging
 
 # Import từ các file khác trong dự án
 from configs import config
-from src.training.dataset import DeepfakeDataset
+from src.architectures.standard.dataset import DeepfakeDataset
 from src.utils.utils import load_checkpoint
 
 # Thiết lập logging
