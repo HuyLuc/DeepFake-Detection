@@ -18,11 +18,35 @@ from torch.amp import autocast, GradScaler
 import psutil
 import gc
 import logging
+import sys
+
+# Hack để đảm bảo import được src.utils
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Import từ các file khác trong dự án
 from configs import config
-from .dataset import DeepfakeDataset  # Import từ cùng thư mục
-from src.utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
+
+# Import Dataset từ cùng thư mục
+from .dataset import DeepfakeDataset
+
+# Handle imports linh hoạt cho nhiều môi trường
+try:
+    from src.utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
+except ModuleNotFoundError:
+    try:
+        from utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
+    except ModuleNotFoundError:
+        # Fallback: Thêm path thủ công
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        from src.utils.utils import save_checkpoint, load_checkpoint, sync_logs_to_drive
 
 # Thiết lập logging với UTF-8 encoding để tránh lỗi Unicode trên Windows
 import sys

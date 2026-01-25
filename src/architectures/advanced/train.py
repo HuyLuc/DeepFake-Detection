@@ -15,6 +15,13 @@ import csv
 import logging
 import sys
 
+# Hack để đảm bảo import được src.models và src.utils
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # Import configs
 from configs import config
 
@@ -22,11 +29,27 @@ from configs import config
 from .temporal_model import TemporalDeepfakeModel, LightweightTemporalModel
 from .ensemble_model import EnsembleDeepfakeModel, TemporalEnsembleModel, create_model
 
-# Import datasets từ cùng thư mục
-from .temporal_dataset import TemporalDeepfakeDataset, create_temporal_dataloaders
+# Import datasets
+try:
+    from .temporal_dataset import TemporalDeepfakeDataset, create_temporal_dataloaders
+except ImportError:
+    # Fallback cho imports
+    from src.architectures.advanced.temporal_dataset import TemporalDeepfakeDataset, create_temporal_dataloaders
 
 # Import utils
-from src.utils.utils import save_checkpoint, load_checkpoint
+try:
+    from src.utils.utils import save_checkpoint, load_checkpoint
+except ModuleNotFoundError:
+    try:
+        from utils.utils import save_checkpoint, load_checkpoint
+    except ModuleNotFoundError:
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        from src.utils.utils import save_checkpoint, load_checkpoint
 
 # Import augmentation
 from src.data_processing.deepfake_augmentation import (
