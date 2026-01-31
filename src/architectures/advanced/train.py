@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.amp import autocast, GradScaler
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 import os
 import csv

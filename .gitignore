@@ -117,3 +117,22 @@ colab_package/
 *.db
 .env.local
 .env.*.local
+
+# ==============================================================================
+# Web App V2.0 - Temporary and generated files
+# ==============================================================================
+# Temporary uploads
+/data/temp_uploads/
+data/temp_uploads/
+*.upload
+
+# Exports
+/exports/
+exports/
+
+# History database (can be committed if small, or ignored)
+history.db
+data/history.db
+
+# Flask session files
+flask_session/
