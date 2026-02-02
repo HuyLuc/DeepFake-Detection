@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} - Phát hiện DeepFake{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Hero Section -->
+    <div class="text-center mb-3">
+        <h1>
+            <span class="text-gradient">Phát hiện DeepFake</span>
+        </h1>
+        <p class="text-secondary" style="font-size: 1.125rem;">
+            AI phân tích ảnh và video để phát hiện nội dung giả mạo
+        </p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card" style="max-width: 800px; margin: 0 auto;">
+
+        <!-- Upload Section -->
+        <div id="upload-section">
+            <div class="card-header">
+                <h3 class="card-title">📤 Tải lên file</h3>
+            </div>
+
+            <!-- Upload Zone -->
+            <div id="upload-zone" class="upload-zone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Kéo thả file vào đây hoặc click để chọn</div>
+                <div class="upload-hint">Hỗ trợ: JPG, PNG, MP4, AVI, MOV (Max: 100MB)</div>
+                <input type="file" id="file-input" accept="image/*,video/*" style="display: none;">
+            </div>
+
+            <!-- File Preview -->
+            <div id="file-preview" class="file-preview hidden">
+                <span id="file-icon" class="file-preview-icon">📄</span>
+                <div class="file-preview-info">
+                    <div id="file-name" class="file-preview-name">filename.jpg</div>
+                    <div id="file-size" class="file-preview-size">0 KB</div>
+                </div>
+                <button id="clear-file" class="btn btn-secondary btn-sm">✕</button>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="form-group mt-2">
+                <label class="form-label">🤖 Chọn model phân tích</label>
+                <select id="model-select" class="form-control">
+                    <option value="standard">Standard - Nhanh, chính xác cơ bản</option>
+                    <option value="advanced">Advanced - Phân tích temporal, chính xác cao</option>
+                    <option value="ensemble">Ensemble - Kết hợp 2 models, độ tin cậy cao nhất</option>
+                </select>
+            </div>
+
+            <!-- Analyze Button -->
+            <button id="analyze-btn" class="btn btn-primary btn-lg" style="width: 100%;" disabled>
+                🔍 Phân tích
+            </button>
+        </div>
+
+        <!-- Result Section (Hidden initially) -->
+        <div id="result-section" class="result-section hidden">
+            <div class="card-header">
+                <h3 class="card-title">📊 Kết quả phân tích</h3>
+                <button id="new-analysis-btn" class="btn btn-secondary btn-sm">+ Phân tích mới</button>
+            </div>
+
+            <!-- Verdict -->
+            <div id="verdict" class="verdict">-</div>
+
+            <!-- Confidence Meter -->
+            <div class="confidence-meter">
+                <div id="confidence-circle" class="confidence-circle" style="--confidence: 0;">
+                    <span id="confidence-value" class="confidence-value">0%</span>
+                </div>
+            </div>
+            <p class="text-secondary">Độ tin cậy</p>
+
+            <!-- Probabilities -->
+            <div class="probabilities">
+                <div class="probability-item">
+                    <div class="probability-label">FAKE</div>
+                    <div class="probability-bar">
+                        <div id="fake-bar" class="probability-fill fake" style="width: 0%;"></div>
+                    </div>
+                    <div id="fake-prob" class="probability-value" style="color: var(--color-fake);">0%</div>
+                </div>
+                <div class="probability-item">
+                    <div class="probability-label">REAL</div>
+                    <div class="probability-bar">
+                        <div id="real-bar" class="probability-fill real" style="width: 0%;"></div>
+                    </div>
+                    <div id="real-prob" class="probability-value" style="color: var(--color-real);">0%</div>
+                </div>
+            </div>
+
+            <!-- Details -->
+            <div id="result-details" class="mt-2" style="text-align: left;">
+                <div class="grid grid-2" style="gap: 1rem; max-width: 400px; margin: 0 auto;">
+                    <div class="text-muted">Model sử dụng:</div>
+                    <div id="detail-model">-</div>
+                    <div class="text-muted">Thời gian xử lý:</div>
+                    <div id="detail-time">-</div>
+                    <div class="text-muted">Loại file:</div>
+                    <div id="detail-type">-</div>
+                </div>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="flex-center mt-3" style="gap: 1rem;">
+                <button id="export-json-btn" class="btn btn-secondary">
+                    📄 Xuất JSON
+                </button>
+                <button id="export-pdf-btn" class="btn btn-secondary">
+                    📑 Xuất PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Section -->
+    <div class="grid grid-3 mt-3" style="max-width: 900px; margin-left: auto; margin-right: auto;">
+        <div class="card text-center">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎯</div>
+            <h4>Độ chính xác cao</h4>
+            <p class="text-muted">Sử dụng EfficientNet-B4 + LSTM đạt độ chính xác trên 95%</p>
+        </div>
+        <div class="card text-center">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
+            <h4>Xử lý nhanh</h4>
+            <p class="text-muted">Phân tích ảnh trong vài giây, video trong vài phút</p>
+        </div>
+        <div class="card text-center">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
+            <h4>Bảo mật</h4>
+            <p class="text-muted">File được xử lý cục bộ, không lưu trữ dữ liệu</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Dashboard specific initialization
+    document.addEventListener('DOMContentLoaded', function () {
+        initDashboard();
+    });
+</script>
+{% endblock %}

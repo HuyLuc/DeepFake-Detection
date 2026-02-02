@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} - Lịch sử phân tích{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Header -->
+    <div class="flex-between mb-3">
+        <h1>📜 Lịch sử phân tích</h1>
+        <button id="clear-history-btn" class="btn btn-danger btn-sm">🗑️ Xóa tất cả</button>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div id="stats-section" class="stats-grid">
+        <div class="stat-card">
+            <div id="stat-total" class="stat-value">0</div>
+            <div class="stat-label">Tổng phân tích</div>
+        </div>
+        <div class="stat-card">
+            <div id="stat-fake" class="stat-value"
+                style="background: var(--color-fake); -webkit-background-clip: text;">0</div>
+            <div class="stat-label">FAKE</div>
+        </div>
+        <div class="stat-card">
+            <div id="stat-real" class="stat-value"
+                style="background: var(--color-real); -webkit-background-clip: text;">0</div>
+            <div class="stat-label">REAL</div>
+        </div>
+        <div class="stat-card">
+            <div id="stat-accuracy" class="stat-value">0%</div>
+            <div class="stat-label">Trung bình tin cậy</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-2">
+        <div class="flex" style="flex-wrap: wrap; gap: 1rem;">
+            <div class="form-group" style="margin: 0; min-width: 150px;">
+                <select id="filter-type" class="form-control">
+                    <option value="">Tất cả loại file</option>
+                    <option value="image">Ảnh</option>
+                    <option value="video">Video</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0; min-width: 150px;">
+                <select id="filter-verdict" class="form-control">
+                    <option value="">Tất cả kết quả</option>
+                    <option value="FAKE">FAKE</option>
+                    <option value="REAL">REAL</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0; min-width: 150px;">
+                <select id="filter-model" class="form-control">
+                    <option value="">Tất cả models</option>
+                    <option value="standard">Standard</option>
+                    <option value="advanced">Advanced</option>
+                    <option value="ensemble">Ensemble</option>
+                </select>
+            </div>
+            <button id="apply-filters-btn" class="btn btn-primary btn-sm">Lọc</button>
+        </div>
+    </div>
+
+    <!-- History Table -->
+    <div class="card">
+        <div class="table-container">
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>Tên file</th>
+                        <th>Loại</th>
+                        <th>Model</th>
+                        <th>Kết quả</th>
+                        <th>Độ tin cậy</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="history-tbody">
+                    <!-- Rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="text-center hidden" style="padding: 3rem;">
+            <div style="font-size: 4rem; opacity: 0.3;">📭</div>
+            <p class="text-muted mt-1">Chưa có lịch sử phân tích nào</p>
+            <a href="/" class="btn btn-primary mt-2">Bắt đầu phân tích</a>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="pagination">
+            <!-- Pagination buttons will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="loading-overlay">
+    <div class="card" style="max-width: 400px; text-align: center;">
+        <h3>⚠️ Xác nhận xóa</h3>
+        <p class="text-secondary mt-1" id="delete-message">Bạn có chắc chắn muốn xóa?</p>
+        <div class="flex-center mt-2" style="gap: 1rem;">
+            <button id="cancel-delete-btn" class="btn btn-secondary">Hủy</button>
+            <button id="confirm-delete-btn" class="btn btn-danger">Xóa</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // History page specific initialization
+    document.addEventListener('DOMContentLoaded', function () {
+        initHistoryPage();
+    });
+</script>
+{% endblock %}

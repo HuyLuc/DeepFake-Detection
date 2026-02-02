@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DeepFake Detection - AI-powered tool to detect fake images and videos">
+    <meta name="keywords" content="deepfake, detection, AI, machine learning, fake detection">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+
+    <!-- Theme initialization (prevent flash) -->
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loader"></div>
+        <div class="loading-text">Đang phân tích...</div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                🔍 <span>DeepFake</span> Detector
+            </a>
+            <div class="navbar-right">
+                <ul class="navbar-nav">
+                    <li><a href="/" class="{{ 'active' if request.endpoint == 'index' else '' }}">Trang chủ</a></li>
+                    <li><a href="/history" class="{{ 'active' if request.endpoint == 'history_page' else '' }}">Lịch
+                            sử</a></li>
+                    <li><a href="/about" class="{{ 'active' if request.endpoint == 'about' else '' }}">Giới thiệu</a>
+                    </li>
+                </ul>
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="theme-toggle" title="Chuyển đổi giao diện">
+                    <span class="icon icon-moon">🌙</span>
+                    <span class="icon icon-sun">☀️</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container" style="padding-top: 2rem; padding-bottom: 2rem;">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>© {{ current_year }} {{ app_name }} V{{ app_version }}</p>
+            <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.5rem;">
+                Powered by EfficientNet + LSTM Deep Learning
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

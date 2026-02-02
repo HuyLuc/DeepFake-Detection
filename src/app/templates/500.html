@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Lỗi server{% endblock %}
+
+{% block content %}
+<div class="error-page animate-fade-in">
+    <div class="error-code">500</div>
+    <div class="error-message">Đã xảy ra lỗi server</div>
+    <p class="text-muted">Chúng tôi đang khắc phục sự cố. Vui lòng thử lại sau.</p>
+    <a href="/" class="btn btn-primary mt-2">🏠 Về trang chủ</a>
+</div>
+{% endblock %}

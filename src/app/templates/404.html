@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}404 - Không tìm thấy{% endblock %}
+
+{% block content %}
+<div class="error-page animate-fade-in">
+    <div class="error-code">404</div>
+    <div class="error-message">Trang bạn tìm kiếm không tồn tại</div>
+    <p class="text-muted">URL có thể đã bị xóa hoặc bạn nhập sai địa chỉ.</p>
+    <a href="/" class="btn btn-primary mt-2">🏠 Về trang chủ</a>
+</div>
+{% endblock %}
