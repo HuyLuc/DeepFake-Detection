@@ -158,8 +158,10 @@ def predict():
         
         try:
             # Build prediction options
+            all_frames_heatmap = request.form.get('all_frames_heatmap', 'false').lower() == 'true'
             prediction_options = {
-                'generate_heatmap': generate_heatmap
+                'generate_heatmap': generate_heatmap,
+                'all_frames_heatmap': all_frames_heatmap
             }
             
             # Run prediction

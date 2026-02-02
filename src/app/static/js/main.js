@@ -128,6 +128,20 @@ function initDashboard() {
     // Export buttons
     document.getElementById('export-json-btn')?.addEventListener('click', () => exportResult('json'));
     document.getElementById('export-pdf-btn')?.addEventListener('click', () => exportResult('pdf'));
+
+    // Heatmap checkbox - show/hide all-frames option
+    const heatmapCheckbox = document.getElementById('heatmap-checkbox');
+    const allFramesOption = document.getElementById('all-frames-option');
+    heatmapCheckbox?.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            allFramesOption?.classList.remove('hidden');
+        } else {
+            allFramesOption?.classList.add('hidden');
+            // Also uncheck all-frames if heatmap is unchecked
+            const allFramesCheckbox = document.getElementById('all-frames-checkbox');
+            if (allFramesCheckbox) allFramesCheckbox.checked = false;
+        }
+    });
 }
 
 function handleFileSelect(file) {
@@ -172,8 +186,9 @@ async function analyzefile() {
     const model = document.getElementById('model-select').value;
     const fileType = currentFile.type.startsWith('video') ? 'video' : 'image';
     const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
+    const allFramesHeatmap = document.getElementById('all-frames-checkbox')?.checked || false;
 
-    console.log('📤 Request params:', { model, fileType, generateHeatmap });
+    console.log('📤 Request params:', { model, fileType, generateHeatmap, allFramesHeatmap });
 
     // Prepare form data
     const formData = new FormData();
@@ -181,8 +196,14 @@ async function analyzefile() {
     formData.append('model', model);
     formData.append('save_history', 'true');
     formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
+    formData.append('all_frames_heatmap', allFramesHeatmap ? 'true' : 'false');
 
-    showLoading(`Đang phân tích ${fileType === 'video' ? 'video' : 'ảnh'}...`);
+    // Adjust loading message based on options
+    let loadingMsg = `Đang phân tích ${fileType === 'video' ? 'video' : 'ảnh'}...`;
+    if (allFramesHeatmap && fileType === 'video') {
+        loadingMsg = 'Đang tạo heatmap cho tất cả frames... (có thể mất vài phút)';
+    }
+    showLoading(loadingMsg);
 
     try {
         const response = await fetch(`${API_BASE}/predict`, {
@@ -261,6 +282,7 @@ function displayResult(result) {
     // Timeline display (for videos)
     const timelineSection = document.getElementById('timeline-section');
     const keyFrameSection = document.getElementById('key-frame-section');
+    const allFramesGallery = document.getElementById('all-frames-gallery');
 
     if (result.timeline && result.timeline.length > 0) {
         renderTimeline(result.timeline, result.stats);
@@ -280,10 +302,68 @@ function displayResult(result) {
         } else {
             keyFrameSection?.classList.add('hidden');
         }
+
+        // All Frames Gallery (when user selected all frames option)
+        if (result.all_frames_heatmaps && result.all_frames_heatmaps.length > 0) {
+            initAllFramesGallery(result.all_frames_heatmaps);
+            allFramesGallery?.classList.remove('hidden');
+            // Hide key frame section when showing all frames
+            keyFrameSection?.classList.add('hidden');
+            console.log('🎞️ All frames gallery displayed with', result.all_frames_heatmaps.length, 'frames');
+        } else {
+            allFramesGallery?.classList.add('hidden');
+        }
     } else {
         timelineSection?.classList.add('hidden');
         keyFrameSection?.classList.add('hidden');
+        allFramesGallery?.classList.add('hidden');
     }
+}
+
+// All Frames Gallery State
+let allFramesData = [];
+let currentFrameIndex = 0;
+
+function initAllFramesGallery(frames) {
+    allFramesData = frames;
+    currentFrameIndex = 0;
+
+    document.getElementById('total-frames-count').textContent = frames.length;
+
+    // Set up navigation buttons
+    document.getElementById('prev-frame-btn')?.addEventListener('click', () => navigateFrame(-1));
+    document.getElementById('next-frame-btn')?.addEventListener('click', () => navigateFrame(1));
+
+    // Display first frame
+    displayGalleryFrame(0);
+}
+
+function navigateFrame(direction) {
+    const newIndex = currentFrameIndex + direction;
+    if (newIndex >= 0 && newIndex < allFramesData.length) {
+        displayGalleryFrame(newIndex);
+    }
+}
+
+function displayGalleryFrame(index) {
+    if (index < 0 || index >= allFramesData.length) return;
+
+    currentFrameIndex = index;
+    const frame = allFramesData[index];
+
+    document.getElementById('current-frame-idx').textContent = index + 1;
+    document.getElementById('gallery-frame-number').textContent = frame.frame_number;
+    document.getElementById('gallery-confidence').textContent = (frame.confidence * 100).toFixed(1) + '%';
+    document.getElementById('gallery-frame-image').src = frame.image_base64;
+
+    // Update verdict badge
+    const verdictBadge = document.getElementById('gallery-verdict-badge');
+    verdictBadge.textContent = frame.verdict;
+    verdictBadge.style.color = frame.verdict === 'FAKE' ? 'var(--color-fake)' : 'var(--color-real)';
+
+    // Update button states
+    document.getElementById('prev-frame-btn').disabled = index === 0;
+    document.getElementById('next-frame-btn').disabled = index === allFramesData.length - 1;
 }
 
 // Timeline Chart Instance (for cleanup)

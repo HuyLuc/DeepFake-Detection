@@ -325,6 +325,41 @@ class PredictionService:
                             logger.info(f"🔥 Key frame heatmap generated for frame {key_frame_number}")
                         else:
                             logger.warning(f"⚠️ Key frame heatmap failed: {explanation.get('error')}")
+                        
+                        # Generate heatmaps for ALL frames if requested
+                        if options.get('all_frames_heatmap', False):
+                            logger.info(f"🎞️ Generating heatmaps for all {len(all_frames)} frames...")
+                            all_heatmaps = []
+                            
+                            for i, frame in enumerate(all_frames):
+                                try:
+                                    # Get timeline info for this frame
+                                    frame_info = timeline[i] if i < len(timeline) else {'frame': i+1, 'verdict': 'UNKNOWN', 'confidence': 0}
+                                    
+                                    frame_explanation = explainability_service.generate_explanation(
+                                        image=frame,
+                                        model=model_for_heatmap,
+                                        prediction_result={'verdict': frame_info.get('verdict', 'UNKNOWN')},
+                                        device=device,
+                                        save_to_disk=False  # Don't save each one to disk
+                                    )
+                                    
+                                    if frame_explanation.get('success'):
+                                        all_heatmaps.append({
+                                            'frame_number': frame_info.get('frame', i+1),
+                                            'image_base64': frame_explanation['heatmap_base64'],
+                                            'verdict': frame_info.get('verdict', 'UNKNOWN'),
+                                            'confidence': frame_info.get('confidence', 0)
+                                        })
+                                except Exception as frame_err:
+                                    logger.warning(f"⚠️ Failed to generate heatmap for frame {i+1}: {frame_err}")
+                                
+                                # Progress log every 5 frames
+                                if (i + 1) % 5 == 0:
+                                    logger.info(f"   📊 Processed {i+1}/{len(all_frames)} frames")
+                            
+                            result['all_frames_heatmaps'] = all_heatmaps
+                            logger.info(f"✅ Generated {len(all_heatmaps)} frame heatmaps")
                     else:
                         logger.warning("⚠️ Grad-CAM not available for key frame")
             except Exception as e:

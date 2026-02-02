@@ -1092,3 +1092,26 @@ tr:hover {
 [data-theme="light"] .key-frame-section {
     background: rgba(255, 71, 87, 0.03);
 }
+
+/* All Frames Gallery */
+.all-frames-gallery {
+    margin-top: var(--space-lg);
+    padding: var(--space-md);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.all-frames-gallery .frames-navigation button {
+    min-width: 80px;
+}
+
+.all-frames-gallery .frames-navigation button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Warning text */
+.text-warning {
+    color: var(--color-warning);
+}

@@ -61,6 +61,18 @@
                 <small class="text-muted" style="display: block; margin-left: 1.5rem;">
                     Tạo bản đồ nhiệt cho thấy vùng nào trên khuôn mặt ảnh hưởng đến quyết định
                 </small>
+
+                <!-- All Frames Heatmap Option (hidden by default, shown when heatmap is checked) -->
+                <div id="all-frames-option" class="mt-1 hidden" style="margin-left: 1.5rem;">
+                    <label class="form-checkbox">
+                        <input type="checkbox" id="all-frames-checkbox">
+                        <span class="checkmark"></span>
+                        📹 Xem heatmap TẤT CẢ frames (video)
+                    </label>
+                    <small class="text-warning" style="display: block; margin-left: 1.5rem;">
+                        ⚠️ Chậm hơn! Sẽ tạo heatmap cho mỗi frame trong video
+                    </small>
+                </div>
             </div>
 
             <!-- Analyze Button -->
@@ -153,6 +165,29 @@
                         <img id="key-frame-image" src="" alt="Key Frame Heatmap" class="heatmap-image">
                     </div>
                     <p id="key-frame-explanation" class="text-muted mt-1" style="font-size: 0.85rem;"></p>
+                </div>
+
+                <!-- All Frames Gallery (when user selects all frames option) -->
+                <div id="all-frames-gallery" class="all-frames-gallery hidden mt-2">
+                    <h5 style="margin-bottom: 0.75rem;">🎞️ Heatmap Tất Cả Frames</h5>
+                    <div class="frames-navigation"
+                        style="display: flex; align-items: center; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+                        <button id="prev-frame-btn" class="btn btn-secondary btn-sm">← Trước</button>
+                        <span class="stat-badge">
+                            Frame <span id="current-frame-idx">1</span> / <span id="total-frames-count">1</span>
+                        </span>
+                        <button id="next-frame-btn" class="btn btn-secondary btn-sm">Sau →</button>
+                    </div>
+                    <div class="frame-display">
+                        <div class="frame-info" style="margin-bottom: 0.5rem; text-align: center;">
+                            <span class="stat-badge">Frame: <span id="gallery-frame-number">-</span></span>
+                            <span class="stat-badge" id="gallery-verdict-badge">-</span>
+                            <span class="stat-badge">Confidence: <span id="gallery-confidence">-</span></span>
+                        </div>
+                        <div class="heatmap-container">
+                            <img id="gallery-frame-image" src="" alt="Frame Heatmap" class="heatmap-image">
+                        </div>
+                    </div>
                 </div>
             </div>
 
