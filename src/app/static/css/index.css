@@ -502,6 +502,18 @@ select.form-control {
     text-shadow: 0 0 30px rgba(46, 213, 115, 0.5);
 }
 
+.verdict.suspicious {
+    color: var(--color-warning);
+    text-shadow: 0 0 30px rgba(255, 165, 2, 0.5);
+}
+
+.verdict-explanation {
+    font-size: 0.95rem;
+    margin-top: -0.5rem;
+    margin-bottom: var(--space-md);
+    opacity: 0.9;
+}
+
 .confidence-meter {
     width: 200px;
     height: 200px;

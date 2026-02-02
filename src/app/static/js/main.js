@@ -240,6 +240,15 @@ function displayResult(result) {
     verdictEl.textContent = verdict;
     verdictEl.className = 'verdict ' + verdict.toLowerCase();
 
+    // Verdict explanation (for videos with hybrid verdict)
+    const explanationEl = document.getElementById('verdict-explanation');
+    if (result.verdict_explanation && explanationEl) {
+        explanationEl.textContent = result.verdict_explanation;
+        explanationEl.style.display = 'block';
+    } else if (explanationEl) {
+        explanationEl.style.display = 'none';
+    }
+
     // Confidence meter
     document.getElementById('confidence-circle').style.setProperty('--confidence', confidence);
     document.getElementById('confidence-value').textContent = confidence.toFixed(1) + '%';

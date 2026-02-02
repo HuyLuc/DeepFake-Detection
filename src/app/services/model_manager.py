@@ -20,6 +20,74 @@ from src.architectures.advanced.model import TemporalModel
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# HYBRID VERDICT SYSTEM CONSTANTS
+# ============================================================================
+# Thresholds for hybrid verdict (FAKE/SUSPICIOUS/REAL)
+FAKE_RATIO_THRESHOLD_HIGH = 0.50      # >= 50% FAKE -> FAKE
+FAKE_RATIO_THRESHOLD_MEDIUM = 0.20    # >= 20% FAKE -> SUSPICIOUS
+FAKE_RATIO_THRESHOLD_LOW = 0.10       # >= 10% with high confidence -> careful
+MAX_FAKE_CONFIDENCE_CRITICAL = 0.90   # Any frame >= 90% FAKE confidence is critical
+MAX_FAKE_CONFIDENCE_WARNING = 0.85    # Any frame >= 85% FAKE confidence is warning
+
+
+def compute_hybrid_verdict(timeline: List[Dict], fake_ratio: float) -> Tuple[str, float, str]:
+    """
+    Compute video verdict using Hybrid approach:
+    - Combines FAKE ratio AND maximum FAKE confidence
+    - Returns verdict with explanation
+    
+    Args:
+        timeline: List of frame predictions [{frame, verdict, confidence}, ...]
+        fake_ratio: Ratio of FAKE frames (0.0 - 1.0)
+    
+    Returns:
+        (verdict, confidence, explanation)
+        - verdict: 'FAKE', 'SUSPICIOUS', or 'REAL'
+        - confidence: Overall confidence score
+        - explanation: Human-readable explanation
+    """
+    if not timeline:
+        return 'REAL', 0.0, 'Không có frames để phân tích'
+    
+    # Calculate max FAKE confidence from timeline
+    fake_confidences = [
+        item['confidence'] for item in timeline 
+        if item['verdict'] == 'FAKE'
+    ]
+    max_fake_confidence = max(fake_confidences) if fake_confidences else 0.0
+    
+    # Calculate average confidence for verdict
+    all_confidences = [item['confidence'] for item in timeline]
+    avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    
+    # =========== HYBRID LOGIC ===========
+    
+    # Case 1: Clear FAKE (>= 50% FAKE ratio)
+    if fake_ratio >= FAKE_RATIO_THRESHOLD_HIGH:
+        explanation = f'Rõ ràng FAKE: {fake_ratio*100:.1f}% frames là giả mạo'
+        return 'FAKE', avg_confidence, explanation
+    
+    # Case 2: Partial deepfake detected (>= 10% FAKE with critical confidence >= 90%)
+    if fake_ratio >= FAKE_RATIO_THRESHOLD_LOW and max_fake_confidence >= MAX_FAKE_CONFIDENCE_CRITICAL:
+        explanation = f'Phát hiện deepfake một phần: {fake_ratio*100:.1f}% frames FAKE với độ tin cậy cao ({max_fake_confidence*100:.1f}%)'
+        return 'FAKE', max_fake_confidence, explanation
+    
+    # Case 3: SUSPICIOUS (20-50% FAKE ratio)
+    if fake_ratio >= FAKE_RATIO_THRESHOLD_MEDIUM:
+        explanation = f'Nghi ngờ: {fake_ratio*100:.1f}% frames có dấu hiệu giả mạo'
+        return 'SUSPICIOUS', avg_confidence, explanation
+    
+    # Case 4: SUSPICIOUS (any frame with >= 85% FAKE confidence)
+    if max_fake_confidence >= MAX_FAKE_CONFIDENCE_WARNING:
+        explanation = f'Cảnh báo: Có frame với độ FAKE cao ({max_fake_confidence*100:.1f}%)'
+        return 'SUSPICIOUS', max_fake_confidence, explanation
+    
+    # Case 5: REAL (no significant FAKE signals)
+    real_ratio = 1 - fake_ratio
+    explanation = f'Video thật: {real_ratio*100:.1f}% frames là thật'
+    return 'REAL', avg_confidence, explanation
+
 
 class ModelManager:
     """
@@ -308,19 +376,17 @@ class ModelManager:
             total_frames = len(frames)
             fake_ratio = fake_count / total_frames if total_frames > 0 else 0
             
-            # Final verdict: FAKE nếu > 50% frames là FAKE
-            final_verdict = 'FAKE' if fake_ratio > 0.5 else 'REAL'
+            # HYBRID VERDICT SYSTEM
+            final_verdict, verdict_confidence, verdict_explanation = compute_hybrid_verdict(
+                timeline, fake_ratio
+            )
             
-            # Average confidence của verdict class
-            verdict_confidences = [
-                item['confidence'] for item in timeline
-                if item['verdict'] == final_verdict
-            ]
-            avg_confidence = sum(verdict_confidences) / len(verdict_confidences) if verdict_confidences else 0
+            logger.info(f"📊 Video verdict: {final_verdict} ({verdict_confidence*100:.1f}%) - {verdict_explanation}")
             
             return {
                 'verdict': final_verdict,
-                'confidence': avg_confidence,
+                'confidence': verdict_confidence,
+                'verdict_explanation': verdict_explanation,
                 'timeline': timeline,
                 'stats': {
                     'total_frames': total_frames,
@@ -385,17 +451,18 @@ class ModelManager:
             # Aggregate
             total_sequences = num_sequences
             fake_ratio = fake_count / total_sequences if total_sequences > 0 else 0
-            final_verdict = 'FAKE' if fake_ratio > 0.5 else 'REAL'
             
-            verdict_confidences = [
-                item['confidence'] for item in timeline
-                if item['verdict'] == final_verdict
-            ]
-            avg_confidence = sum(verdict_confidences) / len(verdict_confidences) if verdict_confidences else 0
+            # HYBRID VERDICT SYSTEM
+            final_verdict, verdict_confidence, verdict_explanation = compute_hybrid_verdict(
+                timeline, fake_ratio
+            )
+            
+            logger.info(f"📊 Video verdict (advanced): {final_verdict} ({verdict_confidence*100:.1f}%) - {verdict_explanation}")
             
             return {
                 'verdict': final_verdict,
-                'confidence': avg_confidence,
+                'confidence': verdict_confidence,
+                'verdict_explanation': verdict_explanation,
                 'timeline': timeline,
                 'stats': {
                     'total_frames': len(frames),
