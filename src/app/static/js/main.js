@@ -171,12 +171,16 @@ async function analyzefile() {
 
     const model = document.getElementById('model-select').value;
     const fileType = currentFile.type.startsWith('video') ? 'video' : 'image';
+    const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
+
+    console.log('📤 Request params:', { model, fileType, generateHeatmap });
 
     // Prepare form data
     const formData = new FormData();
     formData.append('file', currentFile);
     formData.append('model', model);
     formData.append('save_history', 'true');
+    formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
 
     showLoading(`Đang phân tích ${fileType === 'video' ? 'video' : 'ảnh'}...`);
 
@@ -233,13 +237,180 @@ function displayResult(result) {
     document.getElementById('detail-model').textContent = result.model_used || '-';
     document.getElementById('detail-time').textContent = (result.processing_time || 0).toFixed(2) + 's';
     document.getElementById('detail-type').textContent = result.file_info?.file_type || '-';
+
+    // Heatmap display
+    const heatmapSection = document.getElementById('heatmap-section');
+    const heatmapImage = document.getElementById('heatmap-image');
+    const heatmapExplanation = document.getElementById('heatmap-explanation');
+
+    console.log('📋 Checking heatmap in result:', {
+        hasHeatmap: !!result.heatmap,
+        hasBase64: result.heatmap?.image_base64 ? 'yes (length: ' + result.heatmap.image_base64.length + ')' : 'no'
+    });
+
+    if (result.heatmap && result.heatmap.image_base64) {
+        heatmapImage.src = result.heatmap.image_base64;
+        heatmapExplanation.textContent = result.heatmap.explanation || '';
+        heatmapSection?.classList.remove('hidden');
+        console.log('🔥 Heatmap displayed');
+    } else {
+        heatmapSection?.classList.add('hidden');
+        console.log('⚠️ No heatmap in result');
+    }
+
+    // Timeline display (for videos)
+    const timelineSection = document.getElementById('timeline-section');
+    const keyFrameSection = document.getElementById('key-frame-section');
+
+    if (result.timeline && result.timeline.length > 0) {
+        renderTimeline(result.timeline, result.stats);
+        timelineSection?.classList.remove('hidden');
+        console.log('📈 Timeline displayed');
+
+        // Key Frame Heatmap (for videos with heatmap enabled)
+        if (result.key_frame_heatmap && result.key_frame_heatmap.image_base64) {
+            document.getElementById('key-frame-number').textContent = result.key_frame_heatmap.frame_number;
+            document.getElementById('key-frame-score').textContent =
+                (result.key_frame_heatmap.fake_score * 100).toFixed(1) + '%';
+            document.getElementById('key-frame-image').src = result.key_frame_heatmap.image_base64;
+            document.getElementById('key-frame-explanation').textContent =
+                result.key_frame_heatmap.explanation || '';
+            keyFrameSection?.classList.remove('hidden');
+            console.log('🔑 Key frame heatmap displayed for frame', result.key_frame_heatmap.frame_number);
+        } else {
+            keyFrameSection?.classList.add('hidden');
+        }
+    } else {
+        timelineSection?.classList.add('hidden');
+        keyFrameSection?.classList.add('hidden');
+    }
+}
+
+// Timeline Chart Instance (for cleanup)
+let timelineChartInstance = null;
+
+function renderTimeline(timeline, stats) {
+    // Update stats badges
+    if (stats) {
+        document.getElementById('timeline-frames').textContent = stats.total_frames || timeline.length;
+        document.getElementById('timeline-fake-count').textContent = stats.fake_count || 0;
+        document.getElementById('timeline-real-count').textContent = stats.real_count || 0;
+    }
+
+    // Prepare chart data
+    const labels = timeline.map(item => `Frame ${item.frame}`);
+    const confidences = timeline.map(item => item.confidence * 100);
+    const verdicts = timeline.map(item => item.verdict);
+
+    // Color based on verdict
+    const backgroundColors = verdicts.map(v =>
+        v === 'FAKE' ? 'rgba(255, 71, 87, 0.6)' : 'rgba(46, 213, 115, 0.6)'
+    );
+    const borderColors = verdicts.map(v =>
+        v === 'FAKE' ? 'rgb(255, 71, 87)' : 'rgb(46, 213, 115)'
+    );
+
+    // Destroy previous chart if exists
+    if (timelineChartInstance) {
+        timelineChartInstance.destroy();
+    }
+
+    // Create chart
+    const ctx = document.getElementById('timeline-chart').getContext('2d');
+
+    timelineChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Confidence (%)',
+                data: confidences,
+                borderColor: 'rgb(108, 99, 255)',
+                backgroundColor: 'rgba(108, 99, 255, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: backgroundColors,
+                pointBorderColor: borderColors,
+                pointRadius: 5,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const idx = context.dataIndex;
+                            const verdict = verdicts[idx];
+                            const conf = confidences[idx].toFixed(1);
+                            return `${verdict}: ${conf}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Confidence (%)',
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Frames',
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        maxTicksLimit: 10
+                    }
+                }
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const idx = elements[0].index;
+                    const frame = timeline[idx];
+                    alert(`Frame ${frame.frame}: ${frame.verdict} (${(frame.confidence * 100).toFixed(1)}%)`);
+                }
+            }
+        }
+    });
+
+    console.log('📈 Timeline chart rendered with', timeline.length, 'points');
 }
 
 function resetDashboard() {
     clearFile();
     hideElement('result-section');
+    hideElement('heatmap-section');
+    hideElement('timeline-section');
     showElement('upload-section');
     currentHistoryId = null;
+
+    // Destroy chart if exists
+    if (timelineChartInstance) {
+        timelineChartInstance.destroy();
+        timelineChartInstance = null;
+    }
 }
 
 async function exportResult(format) {

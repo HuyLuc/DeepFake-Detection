@@ -12,6 +12,7 @@ from PIL import Image
 
 from .model_manager import ModelManager
 from .file_processor import FileProcessor
+from .explainability_service import get_explainability_service
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,39 @@ class PredictionService:
         if 'models_comparison' in prediction:
             result['models_comparison'] = prediction['models_comparison']
         
+        # 4. Generate Grad-CAM heatmap if requested
+        if options.get('generate_heatmap', False):
+            try:
+                explainability_service = get_explainability_service()
+                if explainability_service.enabled:
+                    # Use standard model for heatmap (simpler, faster)
+                    model_for_heatmap = self.model_manager.get_model('standard')
+                    device = str(self.model_manager.get_device())
+                    
+                    explanation = explainability_service.generate_explanation(
+                        image=face,
+                        model=model_for_heatmap,
+                        prediction_result=result,
+                        device=device,
+                        save_to_disk=True,
+                        prediction_id=options.get('prediction_id')
+                    )
+                    
+                    if explanation.get('success'):
+                        result['heatmap'] = {
+                            'image_base64': explanation['heatmap_base64'],
+                            'explanation': explanation['explanation'],
+                            'path': explanation.get('heatmap_path')
+                        }
+                        logger.info("🔥 Heatmap generated successfully")
+                    else:
+                        logger.warning(f"⚠️ Heatmap generation failed: {explanation.get('error')}")
+                else:
+                    logger.warning("⚠️ Heatmap requested but Grad-CAM not available")
+            except Exception as e:
+                logger.error(f"❌ Error generating heatmap: {e}", exc_info=True)
+                # Don't fail the whole prediction, just skip heatmap
+        
         return result
     
     def _predict_video(self, video_path: str, model_choice: str, options: Dict) -> Dict:
@@ -231,6 +265,70 @@ class PredictionService:
         # Add models_comparison if ensemble
         if 'models_comparison' in prediction:
             result['models_comparison'] = prediction['models_comparison']
+        
+        # 4. Generate Key Frame Heatmap (frame with highest FAKE probability)
+        if options.get('generate_heatmap', False) and len(all_frames) > 0:
+            try:
+                timeline = prediction.get('timeline', [])
+                if timeline:
+                    # Find frame with highest FAKE indication
+                    # For FAKE verdict, use highest confidence; for REAL, find lowest REAL confidence
+                    key_frame_idx = 0
+                    max_fake_score = 0
+                    
+                    for i, item in enumerate(timeline):
+                        if item['verdict'] == 'FAKE':
+                            # FAKE with high confidence = suspicious
+                            fake_score = item['confidence']
+                        else:
+                            # REAL with low confidence = also suspicious
+                            fake_score = 1 - item['confidence']
+                        
+                        if fake_score > max_fake_score:
+                            max_fake_score = fake_score
+                            # Map timeline index to frame index
+                            key_frame_idx = min(item['frame'] - 1, len(all_frames) - 1)
+                    
+                    key_frame = all_frames[max(0, key_frame_idx)]
+                    key_frame_number = timeline[0]['frame'] if timeline else 1  # Fallback
+                    
+                    # Find actual frame number from timeline
+                    for item in timeline:
+                        if item['frame'] - 1 == key_frame_idx:
+                            key_frame_number = item['frame']
+                            break
+                    
+                    logger.info(f"🔑 Key frame selected: Frame {key_frame_number} (index {key_frame_idx}, fake_score: {max_fake_score:.2f})")
+                    
+                    # Generate heatmap for key frame
+                    explainability_service = get_explainability_service()
+                    if explainability_service.enabled:
+                        model_for_heatmap = self.model_manager.get_model('standard')
+                        device = str(self.model_manager.get_device())
+                        
+                        explanation = explainability_service.generate_explanation(
+                            image=key_frame,
+                            model=model_for_heatmap,
+                            prediction_result={'verdict': prediction['verdict']},
+                            device=device,
+                            save_to_disk=True,
+                            prediction_id=options.get('prediction_id')
+                        )
+                        
+                        if explanation.get('success'):
+                            result['key_frame_heatmap'] = {
+                                'frame_number': key_frame_number,
+                                'image_base64': explanation['heatmap_base64'],
+                                'explanation': explanation['explanation'],
+                                'fake_score': round(max_fake_score, 3)
+                            }
+                            logger.info(f"🔥 Key frame heatmap generated for frame {key_frame_number}")
+                        else:
+                            logger.warning(f"⚠️ Key frame heatmap failed: {explanation.get('error')}")
+                    else:
+                        logger.warning("⚠️ Grad-CAM not available for key frame")
+            except Exception as e:
+                logger.error(f"❌ Error generating key frame heatmap: {e}", exc_info=True)
         
         return result
 

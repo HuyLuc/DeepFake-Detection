@@ -143,6 +143,7 @@ def predict():
             }), 400
         
         save_history = request.form.get('save_history', 'true').lower() == 'true'
+        generate_heatmap = request.form.get('generate_heatmap', 'false').lower() == 'true'
         
         # Save file temporarily
         filename = secure_filename(file.filename)
@@ -156,12 +157,18 @@ def predict():
         logger.info(f"📁 File saved: {temp_path} ({file_size} bytes)")
         
         try:
+            # Build prediction options
+            prediction_options = {
+                'generate_heatmap': generate_heatmap
+            }
+            
             # Run prediction
             prediction_service = get_prediction_service()
             result = prediction_service.predict(
                 file_path=temp_path,
                 file_type=file_type,
-                model_choice=model_choice
+                model_choice=model_choice,
+                options=prediction_options
             )
             
             # Add file info

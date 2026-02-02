@@ -51,6 +51,18 @@
                 </select>
             </div>
 
+            <!-- Heatmap Option -->
+            <div class="form-group mt-1">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="heatmap-checkbox">
+                    <span class="checkmark"></span>
+                    🔥 Hiển thị Grad-CAM (vùng AI quan tâm)
+                </label>
+                <small class="text-muted" style="display: block; margin-left: 1.5rem;">
+                    Tạo bản đồ nhiệt cho thấy vùng nào trên khuôn mặt ảnh hưởng đến quyết định
+                </small>
+            </div>
+
             <!-- Analyze Button -->
             <button id="analyze-btn" class="btn btn-primary btn-lg" style="width: 100%;" disabled>
                 🔍 Phân tích
@@ -90,6 +102,57 @@
                         <div id="real-bar" class="probability-fill real" style="width: 0%;"></div>
                     </div>
                     <div id="real-prob" class="probability-value" style="color: var(--color-real);">0%</div>
+                </div>
+            </div>
+
+            <!-- Heatmap Display (appears when available) -->
+            <div id="heatmap-section" class="heatmap-section hidden mt-2">
+                <h4 style="margin-bottom: 1rem;">🔥 Grad-CAM Heatmap</h4>
+                <div class="heatmap-container">
+                    <img id="heatmap-image" src="" alt="Grad-CAM Heatmap" class="heatmap-image">
+                </div>
+                <p id="heatmap-explanation" class="text-muted mt-1" style="font-size: 0.9rem;">
+                    <!-- Explanation text will be inserted here -->
+                </p>
+            </div>
+
+            <!-- Video Timeline (appears for video analysis) -->
+            <div id="timeline-section" class="timeline-section hidden mt-2">
+                <h4 style="margin-bottom: 1rem;">📈 Timeline Phân tích Video</h4>
+                <div class="timeline-stats"
+                    style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+                    <div class="stat-badge">
+                        <span class="text-muted">Frames:</span>
+                        <span id="timeline-frames">-</span>
+                    </div>
+                    <div class="stat-badge">
+                        <span class="text-muted">FAKE:</span>
+                        <span id="timeline-fake-count" style="color: var(--color-fake);">-</span>
+                    </div>
+                    <div class="stat-badge">
+                        <span class="text-muted">REAL:</span>
+                        <span id="timeline-real-count" style="color: var(--color-real);">-</span>
+                    </div>
+                </div>
+                <div class="timeline-chart-container">
+                    <canvas id="timeline-chart"></canvas>
+                </div>
+                <p class="text-muted mt-1" style="font-size: 0.85rem; text-align: center;">
+                    Click vào điểm trên biểu đồ để xem chi tiết frame
+                </p>
+
+                <!-- Key Frame Heatmap (most suspicious frame) -->
+                <div id="key-frame-section" class="key-frame-section hidden mt-2">
+                    <h5 style="margin-bottom: 0.75rem;">🔑 Key Frame - Frame nghi ngờ nhất</h5>
+                    <div class="key-frame-info" style="margin-bottom: 0.5rem;">
+                        <span class="stat-badge">Frame: <span id="key-frame-number">-</span></span>
+                        <span class="stat-badge">Độ nghi ngờ: <span id="key-frame-score"
+                                style="color: var(--color-fake);">-</span></span>
+                    </div>
+                    <div class="heatmap-container">
+                        <img id="key-frame-image" src="" alt="Key Frame Heatmap" class="heatmap-image">
+                    </div>
+                    <p id="key-frame-explanation" class="text-muted mt-1" style="font-size: 0.85rem;"></p>
                 </div>
             </div>
 

@@ -967,3 +967,128 @@ tr:hover {
 [data-theme="light"] .btn-secondary:hover {
     background: rgba(0, 0, 0, 0.08);
 }
+
+/* ===========================================================================
+   Heatmap / Grad-CAM Styles
+   =========================================================================== */
+
+.heatmap-section {
+    padding: var(--space-lg);
+    margin-top: var(--space-lg);
+    background: var(--bg-glass);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.heatmap-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-md);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius);
+}
+
+.heatmap-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    animation: heatmap-appear 0.5s ease-out;
+}
+
+@keyframes heatmap-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Checkbox Styles */
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.form-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.form-checkbox .checkmark {
+    display: none;
+    /* Using native checkbox for simplicity */
+}
+
+/* Light theme adjustments for heatmap */
+[data-theme="light"] .heatmap-container {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .heatmap-section {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* ===========================================================================
+   Timeline Chart Styles
+   =========================================================================== */
+
+.timeline-section {
+    padding: var(--space-lg);
+    margin-top: var(--space-lg);
+    background: var(--bg-glass);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.timeline-chart-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius);
+    padding: var(--space-md);
+    min-height: 250px;
+}
+
+.stat-badge {
+    background: var(--bg-glass);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+}
+
+[data-theme="light"] .timeline-chart-container {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .stat-badge {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* Key Frame Section */
+.key-frame-section {
+    margin-top: var(--space-lg);
+    padding: var(--space-md);
+    background: rgba(255, 71, 87, 0.05);
+    border: 1px solid rgba(255, 71, 87, 0.2);
+    border-radius: var(--border-radius);
+}
+
+.key-frame-info {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+[data-theme="light"] .key-frame-section {
+    background: rgba(255, 71, 87, 0.03);
+}

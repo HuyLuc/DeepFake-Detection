@@ -127,6 +127,27 @@ class ModelManager:
             logger.error(f"❌ Error loading models: {e}", exc_info=True)
             raise
     
+    def get_model(self, model_type: str = 'standard') -> torch.nn.Module:
+        """
+        Get model reference for external use (e.g., Grad-CAM)
+        
+        Args:
+            model_type: 'standard' or 'advanced'
+            
+        Returns:
+            PyTorch model instance
+        """
+        if model_type == 'standard':
+            return self.standard_model
+        elif model_type == 'advanced':
+            return self.advanced_model
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
+    
+    def get_device(self) -> torch.device:
+        """Get current device (cpu/cuda)"""
+        return self.device
+    
     def _prepare_image(self, image: Image.Image) -> torch.Tensor:
         """
         Prepare single image for inference
