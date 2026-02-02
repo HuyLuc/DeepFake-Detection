@@ -102,6 +102,22 @@ def run_temporal_training(
     # =========================================================================
     print("\n📂 Loading datasets...")
     
+    # Tự động điều chỉnh NUM_WORKERS dựa trên RAM
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        available_ram_gb = memory.available / 1e9
+        if available_ram_gb < 4:
+            num_workers = 0
+        elif available_ram_gb < 8:
+            num_workers = 2
+        else:
+            num_workers = 4
+        print(f"   🔧 Auto-configured NUM_WORKERS: {num_workers} (Available RAM: {available_ram_gb:.1f}GB)")
+    except ImportError:
+        num_workers = 2
+        print("   ⚠️ psutil not found, defaulting NUM_WORKERS=2")
+
     train_dir = os.path.join(config.PROCESSED_DATA_DIR, 'train')
     val_dir = os.path.join(config.PROCESSED_DATA_DIR, 'val')
     
@@ -129,8 +145,8 @@ def run_temporal_training(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=4,
-        pin_memory=True,
+        num_workers=num_workers,
+        pin_memory=True if device.type == 'cuda' else False,
         drop_last=True
     )
     
@@ -138,8 +154,8 @@ def run_temporal_training(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,
-        pin_memory=True
+        num_workers=num_workers,
+        pin_memory=True if device.type == 'cuda' else False
     )
     
     print(f"   Train: {len(train_dataset)} videos ({len(train_loader)} batches)")

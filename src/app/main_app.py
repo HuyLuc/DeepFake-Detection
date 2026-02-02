@@ -1,295 +1,194 @@
 # src/app/main_app.py
+"""
+DeepFake Detection Web App V2.0 (Renamed from app_v2.py)
+Main Flask Application with API routes, database, and modern features
+"""
 
-from flask import Flask, request, jsonify, render_template
-from typing import Tuple, Optional
-import torch
-import timm
-from torchvision import transforms
-from PIL import Image
-import io
-import cv2
 import os
-import tempfile
-import mediapipe as mp
+import sys
 import logging
-import atexit
+from datetime import datetime
+from flask import Flask, render_template, jsonify, request
+from flask_cors import CORS
+import secrets
 
-# Import từ các file khác trong dự án
-from configs import config
-from src.utils.utils import load_checkpoint
+# Add project root to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from flask_wtf.csrf import CSRFProtect
+# Import database
+from src.app.models.database import init_db
 
-# ==============================================================================
-# --- 1. 🚀 KHỞI TẠO ỨNG DỤNG VÀ CÁC THÀNH PHẦN CỐ ĐỊNH ---
-# ==============================================================================
-# Thiết lập logging
+# Import blueprints
+from src.app.api.routes import api
+from src.app.api.export_routes import export_api
+
+# =============================================================================
+# LOGGING SETUP
+# =============================================================================
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
-logger.info("--- 🚀 Khởi tạo ứng dụng và tải mô hình ---")
-app = Flask(__name__, template_folder='templates')
 
-# 🔐 Cấu hình bảo mật
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'deepfake-detection-secret-key-2026')
-csrf = CSRFProtect(app)
-
-# 🤖 Tải mô hình MỘT LẦN DUY NHẤT khi ứng dụng khởi động
-# Sử dụng config.DEVICE thay vì hardcode CPU
-device = torch.device(config.DEVICE)
-num_classes = len(config.CLASS_NAMES)
-model = timm.create_model(config.MODEL_NAME, pretrained=False, num_classes=num_classes)
-best_model_path = os.path.join(config.MODEL_SAVE_DIR, 'model_best.pth.tar')
-
-try:
-    model, _, _, _ = load_checkpoint(best_model_path, model)
-    model = model.to(device)
-    model.eval()
-    logger.info(f"✅ Mô hình đã được tải và sẵn sàng trên {device}!")
-except Exception as e:
-    logger.error(f"❌ Lỗi khi tải mô hình: {e}", exc_info=True)
-    raise
-
-# Các phép biến đổi cho ảnh đầu vào
-inference_transform = transforms.Compose([
-    transforms.Resize(config.IMAGE_SIZE),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
-
-# Khởi tạo MediaPipe Face Detector
-mp_face_detection = mp.solutions.face_detection
-face_detector = mp_face_detection.FaceDetection(
-    model_selection=getattr(config, 'FACE_DETECTION_MODEL', 1),
-    min_detection_confidence=getattr(config, 'FACE_DETECTION_CONFIDENCE', 0.5)
-)
-
-# Sử dụng CLASS_NAMES từ config thay vì hardcode
-CLASS_NAMES = config.CLASS_NAMES
-
-# ==============================================================================
-# --- 2. 🧠 CÁC HÀM XỬ LÝ LOGIC ---
-# ==============================================================================
-
-def predict_single_face(face_image: Image.Image) -> Tuple[str, float]:
-    """🔮 Dự đoán trên MỘT ảnh khuôn mặt đã được cắt.
+def create_app(config=None):
+    """
+    Application factory
     
     Args:
-        face_image: PIL Image của khuôn mặt đã được cắt
-        
-    Returns:
-        Tuple (predicted_class, confidence_score)
-    """
-    image_tensor = inference_transform(face_image).unsqueeze(0).to(device)
-    with torch.no_grad():
-        outputs = model(image_tensor)
-        probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        confidence, preds = torch.max(probabilities, 1)
+        config: Optional config dict to override defaults
     
-    # Lấy tên lớp và điểm số tin cậy
-    predicted_class = CLASS_NAMES[preds.item()]
-    confidence_score = confidence.item()
-    return predicted_class, confidence_score
-
-# ==============================================================================
-# --- 3. 🌐 ĐỊNH NGHĨA CÁC ĐƯỜNG DẪN (ROUTES) ---
-# ==============================================================================
-
-@app.route('/', methods=['GET'])
-def index():
-    """🏠 Render trang chủ."""
-    return render_template('index.html')
-
-@app.route('/health', methods=['GET'])
-def health():
-    """💚 Endpoint kiểm tra trạng thái hệ thống."""
-    return jsonify({
-        'status': 'healthy',
-        'device': str(device),
-        'model_loaded': model is not None,
-        'model_name': config.MODEL_NAME
+    Returns:
+        Flask application instance
+    """
+    logger.info("="*60)
+    logger.info("🚀 Creating DeepFake Detection Web App V2.0")
+    logger.info("="*60)
+    
+    # Create Flask app
+    app = Flask(
+        __name__,
+        template_folder='templates',
+        static_folder='static'
+    )
+    
+    # ==========================================================================
+    # CONFIGURATION
+    # ==========================================================================
+    
+    # Security Improvement: Load Secret Key from environment
+    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
+    if not app.config['SECRET_KEY']:
+        # For development only, generate a random key. In production, this should be set!
+        logger.warning("⚠️ FLASK_SECRET_KEY not set in environment. Using a random key for this session.")
+        app.config['SECRET_KEY'] = secrets.token_hex(32)
+        
+    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB max upload
+    app.config['UPLOAD_FOLDER'] = os.path.join(project_root, 'data', 'temp_uploads')
+    
+    # Ensure upload folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Override with custom config
+    if config:
+        app.config.update(config)
+    
+    # ==========================================================================
+    # EXTENSIONS
+    # ==========================================================================
+    
+    # CORS
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+        }
     })
-
-def validate_video_file(file) -> Tuple[bool, Optional[str]]:
-    """
-    🔍 Kiểm tra tính hợp lệ của file video.
     
-    Args:
-        file: File object từ Flask request
-        
-    Returns:
-        Tuple (is_valid, error_message)
-    """
-    # ✅ Kiểm tra tên file
-    if not file.filename:
-        return False, "❌ Chưa chọn file nào"
+    # Database
+    init_db(app)
     
-    # 📄 Kiểm tra extension
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in config.ALLOWED_VIDEO_EXTENSIONS:
-        return False, f"❌ Định dạng file không được hỗ trợ. Chỉ chấp nhận: {', '.join(config.ALLOWED_VIDEO_EXTENSIONS)}"
+    # ==========================================================================
+    # REGISTER BLUEPRINTS
+    # ==========================================================================
+    app.register_blueprint(api)
+    app.register_blueprint(export_api)
     
-    # 📊 Kiểm tra kích thước file
-    file.seek(0, os.SEEK_END)
-    file_size_mb = file.tell() / (1024 * 1024)
-    file.seek(0)  # Reset file pointer
+    logger.info("✅ Registered API blueprints")
     
-    if file_size_mb > config.MAX_VIDEO_SIZE_MB:
-        return False, f"❌ File quá lớn. Kích thước tối đa: {config.MAX_VIDEO_SIZE_MB}MB"
+    # ==========================================================================
+    # TEMPLATE ROUTES
+    # ==========================================================================
     
-    return True, None
-
-@app.route('/predict_video', methods=['POST'])
-def predict_video():
-    """🎬 API endpoint để phân tích video và phát hiện deepfake."""
-    """🎬 API endpoint để phân tích video và phát hiện deepfake."""
-    if 'file' not in request.files:
-        return jsonify({'error': '❌ Không có file nào được gửi lên'}), 400
+    @app.route('/')
+    def index():
+        """Main dashboard page"""
+        return render_template('dashboard.html')
     
-    file = request.files['file']
+    @app.route('/history')
+    def history_page():
+        """History page"""
+        return render_template('history.html')
     
-    # Validation input
-    is_valid, error_msg = validate_video_file(file)
-    if not is_valid:
-        logger.warning(f"⚠️ Invalid file upload: {error_msg}")
-        return jsonify({'error': error_msg}), 400
-
-    # Lưu file video tạm thời để xử lý
-    temp_video_path = None
-    cap = None
-    try:
-        # Bug fix: Ghi trực tiếp vào file handle đã mở thay vì dùng file.save()
-        # để tránh file locking error trên Windows
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tfile:
-            # Đọc toàn bộ nội dung file và ghi vào temporary file
-            file.seek(0)  # Đảm bảo file pointer ở đầu
-            tfile.write(file.read())
-            temp_video_path = tfile.name
-
-        cap = cv2.VideoCapture(temp_video_path)
-        if not cap.isOpened():
-            return jsonify({'error': 'Không thể mở file video. Vui lòng kiểm tra định dạng video.'}), 500
-
-        # Kiểm tra video có hợp lệ không
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if fps <= 0 or total_frames <= 0:
-            return jsonify({'error': 'Video không hợp lệ hoặc không có frame nào'}), 400
-
-        fake_evidence_count = 0
-        real_evidence_count = 0
-        frames_with_face = 0
-        total_processed_frames = 0
-        final_verdict = "REAL"  # Mặc định là REAL
-        strongest_fake_confidence = 0.0
-        fake_confidences = []
-        
-        # Tối ưu: Chỉ xử lý mỗi N frame thay vì tất cả để tiết kiệm tài nguyên
-        frame_count = 0
-        skip_frames = config.SKIP_FRAMES
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            frame_count += 1
-            if frame_count % skip_frames != 0:  # Bỏ qua frame
-                continue
-            
-            total_processed_frames += 1
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = face_detector.process(image_rgb)
-
-            if results.detections:
-                frames_with_face += 1  # Chỉ đếm khi thực sự có face
-                detection = results.detections[0]  # Chỉ lấy mặt rõ nhất
-                bboxC = detection.location_data.relative_bounding_box
-                ih, iw, _ = frame.shape
-                x, y, w, h = int(bboxC.xmin * iw), int(bboxC.ymin * ih), int(bboxC.width * iw), int(bboxC.height * ih)
-                
-                margin = config.FACE_MARGIN
-                face_img = frame[max(0, y-margin):y+h+margin, max(0, x-margin):x+w+margin]
-                
-                if face_img.size != 0:
-                    pil_face = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
-                    pred_class, confidence = predict_single_face(pil_face)
-
-                    if pred_class == 'FAKE' and confidence >= config.EVIDENCE_THRESHOLD:
-                        fake_evidence_count += 1
-                        fake_confidences.append(confidence)
-                        if confidence > strongest_fake_confidence:
-                            strongest_fake_confidence = confidence
-                    elif pred_class == 'REAL':
-                        real_evidence_count += 1
-
-        cap.release()
-
-        # Logic quyết định cuối cùng - cải thiện
-        if frames_with_face == 0:
+    @app.route('/about')
+    def about():
+        """About page"""
+        return render_template('about.html')
+    
+    # ==========================================================================
+    # ERROR HANDLERS
+    # ==========================================================================
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        if request.path.startswith('/api/'):
             return jsonify({
-                'error': 'Không phát hiện được khuôn mặt nào trong video. Vui lòng thử video khác.'
-            }), 400
-        
-        # Tính tỷ lệ fake evidence
-        fake_ratio = fake_evidence_count / frames_with_face if frames_with_face > 0 else 0
-        
-        # Quyết định dựa trên tỷ lệ và số lượng evidence từ config
-        if fake_ratio >= config.FAKE_RATIO_THRESHOLD or \
-           (fake_evidence_count >= config.MIN_FAKE_EVIDENCE_COUNT and strongest_fake_confidence >= config.STRONG_CONFIDENCE_THRESHOLD):
-            final_verdict = "FAKE"
-            avg_confidence = sum(fake_confidences) / len(fake_confidences) if fake_confidences else 0
-            reason = (
-                f"Phát hiện {fake_evidence_count}/{frames_with_face} khung hình có dấu hiệu giả mạo "
-                f"(tỷ lệ: {fake_ratio*100:.1f}%, độ tin cậy trung bình: {avg_confidence*100:.2f}%)."
-            )
-        else:
-            reason = (
-                f"Không tìm thấy bằng chứng giả mạo rõ ràng. "
-                f"Đã phân tích {frames_with_face} khung hình có khuôn mặt "
-                f"({real_evidence_count} REAL, {fake_evidence_count} FAKE)."
-            )
-        
-        logger.info(f"Prediction completed: {final_verdict}, processed {frames_with_face} frames with faces")
-        
+                'success': False,
+                'error': 'Endpoint not found'
+            }), 404
+        return render_template('404.html'), 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'error': 'Internal server error'
+            }), 500
+        return render_template('500.html'), 500
+    
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
         return jsonify({
-            'verdict': final_verdict,
-            'reason': reason,
-            'processed_frames': frames_with_face,
-            'total_frames': total_processed_frames,
-            'fake_evidence_count': fake_evidence_count,
-            'real_evidence_count': real_evidence_count
-        })
+            'success': False,
+            'error': 'File too large. Maximum size is 100 MB'
+        }), 413
+    
+    # ==========================================================================
+    # CONTEXT PROCESSORS
+    # ==========================================================================
+    
+    @app.context_processor
+    def inject_globals():
+        """Inject global variables into all templates"""
+        return {
+            'app_name': 'DeepFake Detector',
+            'app_version': '2.0.0',
+            'current_year': datetime.now().year
+        }
+    
+    logger.info("✅ App created successfully!")
+    logger.info(f"   Upload folder: {app.config['UPLOAD_FOLDER']}")
+    logger.info("="*60)
+    
+    return app
 
-    except Exception as e:
-        logger.error(f"Error processing video: {e}", exc_info=True)
-        return jsonify({'error': f'Lỗi khi xử lý video: {str(e)}'}), 500
-    finally:
-        if cap is not None:
-            cap.release()
-        if temp_video_path and os.path.exists(temp_video_path):
-            try:
-                os.remove(temp_video_path)  # Xóa file tạm
-            except Exception as e:
-                logger.error(f"Failed to delete temp file {temp_video_path}: {e}")
 
 def run_app():
-
-    # Chạy app ở chế độ debug=False khi triển khai thực tế
-
-    # Lưu ý: debug=True chỉ dùng cho development, không dùng trong production
-
+    """Run the application"""
+    app = create_app()
+    
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-
+    port = int(os.getenv('PORT', 5000))
     
-
-    # Đảm bảo giải phóng tài nguyên khi thoát
-
-    atexit.register(lambda: face_detector.close())
-
+    logger.info(f"🌐 Starting server on http://0.0.0.0:{port}")
+    logger.info(f"   Debug mode: {debug_mode}")
     
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=debug_mode
+    )
 
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
+
+# Entry point
+if __name__ == '__main__':
+    run_app()

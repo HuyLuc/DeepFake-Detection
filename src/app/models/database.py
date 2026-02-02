@@ -7,6 +7,7 @@ SQLite database for history tracking
 import os
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from configs import config  # Import config để lấy BASE_DIR
 
 # Initialize SQLAlchemy (will be attached to Flask app later)
 db = SQLAlchemy()
@@ -91,9 +92,9 @@ def init_db(app):
     Args:
         app: Flask application instance
     """
-    # Configure SQLite database
-    db_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'history.db')
-    db_path = os.path.abspath(db_path)
+    # Configure SQLite database using BASE_DIR from config
+    # Sử dụng thư mục data/ ở root dự án
+    db_path = os.path.join(config.BASE_DIR, 'data', 'history.db')
     
     # Ensure directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -107,6 +108,7 @@ def init_db(app):
     # Create tables
     with app.app_context():
         db.create_all()
-        print(f"✅ Database initialized at: {db_path}")
+        # In thông báo để debug
+        # print(f"✅ Database initialized at: {db_path}")
     
     return db

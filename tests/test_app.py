@@ -1,102 +1,118 @@
 """
-Unit tests cho src/app/main_app.py
+Integration Tests for DeepFake Detection Web App V2.0
+Tests the full application flow including API routes and database.
 """
 
 import unittest
 import os
+import json
 import tempfile
 from io import BytesIO
-from PIL import Image
 
-# Import các hàm cần test
+# Add project root to path for imports
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.app.main_app import validate_video_file
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
+from src.app.main_app import create_app, init_db
+from src.app.models.database import db, PredictionHistory
 
-class TestApp(unittest.TestCase):
-    """Test cases cho Flask app functions"""
+class TestWebAppIntegration(unittest.TestCase):
+    """
+    Integration tests for the Flask Web App.
+    Uses a temporary database and test client.
+    """
     
     def setUp(self):
-        """Setup test fixtures"""
-        self.temp_dir = tempfile.mkdtemp()
-    
-    def tearDown(self):
-        """Cleanup test fixtures"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-    
-    def create_mock_file(self, filename: str, size_mb: float = 1.0) -> object:
-        """Tạo mock file object cho testing"""
-        class MockFile:
-            def __init__(self, name, size_bytes):
-                self.filename = name
-                self._size = size_bytes
-                self._pos = 0
-            
-            def tell(self):
-                return self._size
-            
-            def seek(self, pos, whence=0):
-                if whence == 0:
-                    self._pos = pos
-                elif whence == 1:
-                    self._pos += pos
-                elif whence == 2:
-                    self._pos = self._size + pos
-                return self._pos
-            
-            def read(self):
-                return b'fake video content'
+        """Set up test environment before each test"""
+        # Create a temporary file for the test database
+        self.db_fd, self.db_path = tempfile.mkstemp()
         
-        size_bytes = int(size_mb * 1024 * 1024)
-        return MockFile(filename, size_bytes)
-    
-    def test_validate_video_file_valid(self):
-        """Test validate_video_file với file hợp lệ"""
-        file = self.create_mock_file('test.mp4', size_mb=10.0)
+        # Configure app for testing
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{self.db_path}',
+            'WTF_CSRF_ENABLED': False,  # Disable CSRF for easier API testing
+            'SECRET_KEY': 'test-secret-key'
+        })
         
-        is_valid, error_msg = validate_video_file(file)
+        # Create test client
+        self.client = self.app.test_client()
         
-        self.assertTrue(is_valid, "Valid file should pass validation")
-        self.assertIsNone(error_msg, "No error message for valid file")
-    
-    def test_validate_video_file_invalid_extension(self):
-        """Test validate_video_file với extension không hợp lệ"""
-        file = self.create_mock_file('test.txt', size_mb=10.0)
+        # Create application context
+        self.ctx = self.app.app_context()
+        self.ctx.push()
         
-        is_valid, error_msg = validate_video_file(file)
-        
-        self.assertFalse(is_valid, "Invalid extension should fail")
-        self.assertIsNotNone(error_msg, "Should have error message")
-        self.assertIn('định dạng', error_msg.lower() or '')
-    
-    def test_validate_video_file_too_large(self):
-        """Test validate_video_file với file quá lớn"""
-        # Tạo file > 500MB (MAX_VIDEO_SIZE_MB)
-        file = self.create_mock_file('test.mp4', size_mb=600.0)
-        
-        is_valid, error_msg = validate_video_file(file)
-        
-        self.assertFalse(is_valid, "File too large should fail")
-        self.assertIsNotNone(error_msg, "Should have error message")
-    
-    def test_validate_video_file_no_filename(self):
-        """Test validate_video_file với file không có tên"""
-        class MockFileNoName:
-            filename = None
-            def tell(self): return 0
-            def seek(self, *args): return 0
-            def read(self): return b''
-        
-        file = MockFileNoName()
-        
-        is_valid, error_msg = validate_video_file(file)
-        
-        self.assertFalse(is_valid, "File without filename should fail")
-        self.assertIsNotNone(error_msg)
+        # Create database tables
+        db.create_all()
 
+    def tearDown(self):
+        """Clean up after each test"""
+        db.session.remove()
+        db.drop_all()
+        self.ctx.pop()
+        os.close(self.db_fd)
+        os.unlink(self.db_path)
+
+    def test_health_check(self):
+        """Test the health check endpoint"""
+        response = self.client.get('/api/health')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'healthy')
+        self.assertEqual(data['version'], '2.0.0')
+
+    def test_dashboard_route(self):
+        """Test main dashboard route returns 200"""
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'DeepFake Detector', response.data)
+
+    def test_history_api_empty(self):
+        """Test getting history when empty"""
+        response = self.client.get('/api/history')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['total'], 0)
+        self.assertEqual(len(data['items']), 0)
+
+    def test_create_and_get_history(self):
+        """Test creating a record directly in DB and retrieving it via API"""
+        # Create dummy record
+        record = PredictionHistory(
+            file_name="test_video.mp4",
+            file_type="video",
+            model_used="standard",
+            verdict="FAKE",
+            confidence=0.95,
+            fake_probability=0.95,
+            real_probability=0.05
+        )
+        db.session.add(record)
+        db.session.commit()
+        
+        # Get history
+        response = self.client.get('/api/history')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['items'][0]['file_name'], "test_video.mp4")
+        self.assertEqual(data['items'][0]['verdict'], "FAKE")
+
+    def test_predict_endpoint_no_file(self):
+        """Test predict endpoint without file"""
+        response = self.client.post('/api/predict')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('No file', data['error'])
+
+    # Note: We skip testing actual prediction (uploading file) here 
+    # because it requires loading the heavy ML model and creating fake video files.
+    # That belongs in a separate E2E test suite or System test.
 
 if __name__ == '__main__':
     unittest.main()
-

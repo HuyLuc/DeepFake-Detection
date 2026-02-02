@@ -356,7 +356,16 @@ function renderHistoryTable(items) {
     const tbody = document.getElementById('history-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = items.map(item => `
+    // Filter out items without valid numeric id FIRST
+    const validItems = items.filter(item => {
+        const isValid = Number.isInteger(item.id) && item.id > 0;
+        if (!isValid) {
+            console.warn('⚠️ Skipping item with invalid id:', item);
+        }
+        return isValid;
+    });
+
+    tbody.innerHTML = validItems.map(item => `
         <tr data-id="${item.id}">
             <td>${formatDate(item.created_at)}</td>
             <td>${item.file_name || '-'}</td>
@@ -365,12 +374,33 @@ function renderHistoryTable(items) {
             <td><span class="badge badge-${item.verdict?.toLowerCase()}">${item.verdict}</span></td>
             <td>${((item.confidence || 0) * 100).toFixed(1)}%</td>
             <td>
-                <button class="btn btn-secondary btn-sm" onclick="exportHistoryItem(${item.id}, 'json')">📄</button>
-                <button class="btn btn-secondary btn-sm" onclick="exportHistoryItem(${item.id}, 'pdf')">📑</button>
-                <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${item.id})">🗑️</button>
+                <button class="btn btn-secondary btn-sm action-export-json" data-id="${item.id}">📄</button>
+                <button class="btn btn-secondary btn-sm action-export-pdf" data-id="${item.id}">📑</button>
+                <button class="btn btn-danger btn-sm action-delete" data-id="${item.id}">🗑️</button>
             </td>
         </tr>
     `).join('');
+
+    // Use event delegation for actions - prevents null id issues
+    tbody.onclick = function (e) {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        const id = parseInt(btn.dataset.id, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+            console.error('❌ Invalid id from button:', btn.dataset.id);
+            alert('Lỗi: ID không hợp lệ!');
+            return;
+        }
+
+        if (btn.classList.contains('action-export-json')) {
+            exportHistoryItem(id, 'json');
+        } else if (btn.classList.contains('action-export-pdf')) {
+            exportHistoryItem(id, 'pdf');
+        } else if (btn.classList.contains('action-delete')) {
+            showDeleteModal(id);
+        }
+    };
 }
 
 function renderPagination(current, total) {
@@ -441,6 +471,13 @@ async function exportHistoryItem(id, format) {
 let deleteTarget = null;
 
 function showDeleteModal(target) {
+    // Validate target - prevent null/undefined
+    if (target === null || target === undefined) {
+        console.error('showDeleteModal called with invalid target:', target);
+        alert('Lỗi: Không thể xác định mục cần xóa');
+        return;
+    }
+
     deleteTarget = target;
     const modal = document.getElementById('delete-modal');
     const message = document.getElementById('delete-message');
@@ -460,7 +497,13 @@ function hideDeleteModal() {
 }
 
 async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget) {
+        console.error('❌ confirmDelete called but deleteTarget is null');
+        return;
+    }
+
+    // CRITICAL: Save target BEFORE hiding modal (which resets deleteTarget to null)
+    const targetToDelete = deleteTarget;
 
     hideDeleteModal();
     showLoading('Đang xóa...');
@@ -468,14 +511,15 @@ async function confirmDelete() {
     try {
         let response;
 
-        if (deleteTarget === 'all') {
+        if (targetToDelete === 'all') {
             response = await fetch(`${API_BASE}/history`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ confirm: true })
             });
         } else {
-            response = await fetch(`${API_BASE}/history/${deleteTarget}`, {
+            console.log('🗑️ Deleting item with id:', targetToDelete);
+            response = await fetch(`${API_BASE}/history/${targetToDelete}`, {
                 method: 'DELETE'
             });
         }
