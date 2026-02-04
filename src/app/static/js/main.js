@@ -12,8 +12,11 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 // Global state
 let currentFile = null;
 let batchFiles = []; // For batch processing
+let batchResults = []; // Store batch results
 let isBatchProcessing = false;
 let currentHistoryId = null;
+
+
 let historyPage = 1;
 let historyFilters = {};
 
@@ -127,6 +130,9 @@ function initDashboard() {
     // New analysis button
     newAnalysisBtn?.addEventListener('click', () => resetDashboard());
 
+    // Back to Batch button
+    document.getElementById('back-to-batch-btn')?.addEventListener('click', backToBatchResult);
+
     // Export buttons
     document.getElementById('export-json-btn')?.addEventListener('click', () => exportResult('json'));
     document.getElementById('export-pdf-btn')?.addEventListener('click', () => exportResult('pdf'));
@@ -160,20 +166,28 @@ function handleFileSelect(files) {
 
     // Convert FileList to Array
     const fileList = Array.from(files);
+    console.log(`📥 Input files: ${fileList.length}`);
 
-    // Validation
-    const validFileTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/avi', 'video/quicktime', 'video/webm'];
+    // Validation using Extensions (more robust than MIME)
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'];
+
     const validFiles = fileList.filter(file => {
+        // Size check
         if (file.size > MAX_FILE_SIZE) {
-            console.warn(`File ${file.name} quá lớn!`);
+            console.warn(`⚠️ File ${file.name} quá lớn!`);
             return false;
         }
-        if (!validFileTypes.some(t => file.type.includes(t.split('/')[1]))) {
-            console.warn(`File ${file.name} không hỗ trợ!`);
+
+        // Extension check
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+            console.warn(`⚠️ File ${file.name} không hỗ trợ (ext: ${ext}, type: ${file.type})!`);
             return false;
         }
         return true;
     });
+
+    console.log(`✅ Valid files: ${validFiles.length}`);
 
     if (validFiles.length === 0) {
         alert('Không có file hợp lệ!');
@@ -221,6 +235,7 @@ function initSingleFileUI(file) {
 }
 
 function initBatchUI(files) {
+    batchResults = new Array(files.length).fill(null);
     const uploadZone = document.getElementById('upload-zone');
     uploadZone.classList.add('has-file');
 
@@ -236,10 +251,17 @@ function initBatchUI(files) {
     const tbody = document.getElementById('batch-queue-tbody');
     tbody.innerHTML = files.map((file, index) => `
         <tr id="batch-item-${index}">
-            <td>${file.name}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</td>
             <td>${formatFileSize(file.size)}</td>
-            <td><span class="status-badge status-pending" id="status-${index}">Wait</span></td>
-            <td><span id="result-${index}">-</span></td>
+            <td>
+                <div class="flex-center" style="justify-content: flex-start; gap: 8px;">
+                    <span class="status-badge status-pending" id="status-${index}">Wait</span>
+                    <div class="progress-track" style="width: 60px; height: 4px; display: none;" id="progress-track-${index}">
+                        <div class="progress-fill" style="width: 0%;" id="progress-bar-${index}"></div>
+                    </div>
+                </div>
+            </td>
+            <td><span id="result-${index}" class="flex-center" style="justify-content: flex-start; gap: 8px;">-</span></td>
         </tr>
     `).join('');
 }
@@ -291,8 +313,8 @@ async function processBatchQueue() {
 
     let processedCount = 0;
 
-    // Helper to update progress
-    const updateProgress = () => {
+    // Helper to update global progress
+    const updateGlobalProgress = () => {
         processedCount++;
         const percent = Math.round((processedCount / batchFiles.length) * 100);
         document.getElementById('batch-progress-text').textContent = `${processedCount}/${batchFiles.length}`;
@@ -305,35 +327,51 @@ async function processBatchQueue() {
 
         // Update item status to Processing
         const statusEl = document.getElementById(`status-${i}`);
-        statusEl.className = 'status-badge status-processing icon-spin';
-        statusEl.textContent = '⟳';
+        const progressTrack = document.getElementById(`progress-track-${i}`);
+        const progressBar = document.getElementById(`progress-bar-${i}`);
+
+        statusEl.className = 'status-badge status-processing';
+        statusEl.innerHTML = '<svg class="icon-svg icon-spin" viewBox="0 0 24 24" style="width: 1em; height: 1em;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
+        progressTrack.style.display = 'block';
 
         // Scroll to item
         document.getElementById(`batch-item-${i}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         try {
-            const result = await callPredictAPI(file);
+            const result = await callPredictAPI(file, (percent) => {
+                progressBar.style.width = `${percent}%`;
+            });
 
             if (result.success) {
+                batchResults[i] = result;
+
                 statusEl.className = 'status-badge status-done';
                 statusEl.textContent = 'Done';
+                progressTrack.style.display = 'none';
 
                 const verdictClass = result.verdict === 'FAKE' ? 'text-fake' : 'text-real';
                 const verdictColor = result.verdict === 'FAKE' ? 'var(--color-fake)' : 'var(--color-real)';
+
                 document.getElementById(`result-${i}`).innerHTML =
-                    `<span style="color: ${verdictColor}; font-weight: bold;">${result.verdict}</span> (${(result.confidence * 100).toFixed(0)}%)`;
+                    `<span style="color: ${verdictColor}; font-weight: bold;">${result.verdict}</span> 
+                     <span class="text-muted" style="font-size: 0.85em; margin-left: 4px;">(${(result.confidence * 100).toFixed(0)}%)</span>
+                     <button class="btn btn-secondary btn-sm" onclick="viewBatchResult(${i})" style="padding: 2px 6px; margin-left: auto;" title="Xem chi tiết">
+                        <svg class="icon-svg sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                     </button>`;
             } else {
                 statusEl.className = 'status-badge status-error';
                 statusEl.textContent = 'Err';
+                progressTrack.style.display = 'none';
                 document.getElementById(`result-${i}`).textContent = 'Error';
             }
         } catch (error) {
             statusEl.className = 'status-badge status-error';
             statusEl.textContent = 'Err';
+            progressTrack.style.display = 'none';
             document.getElementById(`result-${i}`).textContent = 'Failed';
         }
 
-        updateProgress();
+        updateGlobalProgress();
     }
 
     isBatchProcessing = false;
@@ -341,25 +379,72 @@ async function processBatchQueue() {
     document.getElementById('analyze-btn').textContent = 'Xong! Phân tích lại';
 }
 
-async function callPredictAPI(file) {
-    const model = document.getElementById('model-select').value;
-    const fileType = file.type.startsWith('video') ? 'video' : 'image';
-    const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
-    const allFramesHeatmap = document.getElementById('all-frames-checkbox')?.checked || false;
+function viewBatchResult(index) {
+    const result = batchResults[index];
+    if (!result) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('model', model);
-    formData.append('save_history', 'true');
-    formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
-    formData.append('all_frames_heatmap', allFramesHeatmap ? 'true' : 'false');
+    displayResult(result);
+    currentHistoryId = result.history_id;
 
-    const response = await fetch(`${API_BASE}/predict`, {
-        method: 'POST',
-        body: formData
+    // UI updates for Batch View
+    showElement('back-to-batch-btn');
+    hideElement('new-analysis-btn'); // Hide "New Analysis" in detail view to avoid confusion
+
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function backToBatchResult() {
+    hideElement('result-section');
+    showElement('upload-section'); // This contains the Batch Queue
+
+    // Reset buttons
+    hideElement('back-to-batch-btn');
+    showElement('new-analysis-btn');
+
+    // Scroll back to queue
+    document.getElementById('batch-queue-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function callPredictAPI(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const model = document.getElementById('model-select').value;
+        const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
+        const allFramesHeatmap = document.getElementById('all-frames-checkbox')?.checked || false;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('model', model);
+        formData.append('save_history', 'true');
+        formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
+        formData.append('all_frames_heatmap', allFramesHeatmap ? 'true' : 'false');
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && onProgress) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                onProgress(percent);
+            }
+        });
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    resolve(result);
+                } catch (e) {
+                    reject(new Error('Invalid JSON response'));
+                }
+            } else {
+                reject(new Error(`Server error: ${xhr.status}`));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+
+        xhr.open('POST', `${API_BASE}/predict`);
+        xhr.send(formData);
     });
-
-    return await response.json();
 }
 
 function displayResult(result) {
