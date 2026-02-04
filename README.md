@@ -25,19 +25,23 @@ Hệ thống phân loại video thành **REAL** (thật) và **FAKE** (giả m�
 
 ### Core Features
 - ✅ Phát hiện deepfake với độ chính xác cao (~95%)
-- ✅ **2 kiến trúc model** để lựa chọn theo nhu cầu
-- ✅ Hỗ trợ nhiều định dạng video (MP4, AVI, MOV, MKV, WebM)
-- ✅ Giao diện web Flask thân thiện
+- ✅ **2 kiến trúc model** (Standard & Advanced)
+- ✅ **X-Ray Lens**: Soi vùng giả mạo (Heatmap) thời gian thực
+- ✅ **Smart Video Timeline**: Biểu đồ phân tích video theo từng giây
+- ✅ **DeepFake Prevention Badge**: Cấp chứng nhận "Verified Real" cho ảnh/video thật
+- ✅ **Batch Processing**: Xử lý hàng loạt file cùng lúc
+- ✅ **API Documentation**: Tích hợp Swagger UI
+- ✅ **Export Reports**: Xuất kết quả ra PDF/JSON
 
 ### Technical Features
 - ✅ **Độ phân giải 380×380** - Tối ưu cho EfficientNet-B4
-- ✅ **20 frames/video** - Uniform sampling
-- ✅ **Deepfake-Specific Augmentation** (JPEG compression, noise, blur, cutout)
+- ✅ **Uniform Sampling**: 20 frames/video cho video ngắn, adaptive cho video dài
+- ✅ **Deepfake-Specific Augmentation** (JPEG, Noise, Blur, Cutout)
 - ✅ **Oversampling** để cân bằng dữ liệu
 - ✅ **LSTM/GRU** để học temporal patterns (flickering)
 - ✅ **Ensemble** EfficientNet + Swin Transformer
-- ✅ Mixed precision training
-- ✅ Early stopping & checkpoint management
+- ✅ Mixed precision training & Early stopping
+- ✅ Client-side optimizations (Canvas Badge, RequestAnimationFrame)
 
 ---
 
@@ -258,6 +262,24 @@ python main.py app
 ```
 
 Mở trình duyệt: `http://localhost:5000`
+
+### Bước 5: Khám phá các tính năng nâng cao
+
+1.  **X-Ray Lens**:
+    - Upload ảnh/video -> Kết quả hiện ra.
+    - Di chuột vào ảnh để bật chế độ "Kính lúp" soi Heatmap.
+
+2.  **Smart Timeline (Video)**:
+    - Upload video -> Xem biểu đồ biến thiên độ Fake.
+    - Click vào điểm trên biểu đồ để tua video đến frame nghi ngờ.
+
+3.  **Chứng nhận (Verified Badge)**:
+    - Nếu kết quả là **REAL** (>90%).
+    - Bấm nút **"Tải chứng nhận"** để lưu ảnh/video frame có đóng dấu bảo mật.
+
+4.  **API Documentation**:
+    - Truy cập `http://localhost:5000/apidocs/` để xem và test API.
+    - Hỗ trợ `/predict`, `/history`, và `/export`.
 
 ---
 
