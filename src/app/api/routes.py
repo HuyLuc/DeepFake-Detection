@@ -84,24 +84,64 @@ def get_file_type(filename):
 def predict():
     """
     Main prediction endpoint
-    
-    Request:
-        - file: File upload (image or video)
-        - model: 'standard', 'advanced', or 'ensemble' (default: 'standard')
-        - save_history: 'true' or 'false' (default: 'true')
-    
-    Response:
-        {
-            "success": bool,
-            "verdict": "FAKE" or "REAL",
-            "confidence": float,
-            "probabilities": {"FAKE": float, "REAL": float},
-            "model_used": str,
-            "processing_time": float,
-            "file_info": {...},
-            "details": {...},
-            "history_id": int (if save_history)
-        }
+    ---
+    tags:
+      - Prediction
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: Image or video file to analyze
+      - name: model
+        in: formData
+        type: string
+        enum: ['standard', 'advanced', 'ensemble']
+        default: 'standard'
+        description: AI Model architecture to use
+      - name: save_history
+        in: formData
+        type: boolean
+        default: true
+        description: Save result to database history
+      - name: generate_heatmap
+        in: formData
+        type: boolean
+        default: false
+        description: Generate Grad-CAM heatmap (for images)
+      - name: all_frames_heatmap
+        in: formData
+        type: boolean
+        default: false
+        description: Generate heatmap for all frames (for videos)
+    responses:
+      200:
+        description: Successful prediction result
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            verdict:
+              type: string
+              enum: ['REAL', 'FAKE']
+            confidence:
+              type: number
+            probabilities:
+              type: object
+              properties:
+                REAL:
+                  type: number
+                FAKE:
+                  type: number
+            history_id:
+              type: integer
+            file_info:
+              type: object
+      400:
+        description: Invalid input or file type
+      500:
+        description: Server error
     """
     try:
         # Validate file
@@ -255,26 +295,62 @@ def predict_video():
 @api.route('/history', methods=['GET'])
 def get_history():
     """
-    Get prediction history with pagination and filters
-    
-    Query params:
-        - page: int (default: 1)
-        - per_page: int (default: 10, max: 100)
-        - file_type: 'image' or 'video' (optional)
-        - verdict: 'FAKE' or 'REAL' (optional)
-        - model: 'standard', 'advanced', or 'ensemble' (optional)
-        - sort_by: column name (default: 'created_at')
-        - sort_order: 'asc' or 'desc' (default: 'desc')
-    
-    Response:
-        {
-            "success": true,
-            "items": [...],
-            "total": int,
-            "page": int,
-            "per_page": int,
-            "pages": int
-        }
+    Get prediction history
+    ---
+    tags:
+      - History
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        type: integer
+        default: 10
+        description: Items per page
+      - name: file_type
+        in: query
+        type: string
+        enum: ['image', 'video']
+        description: Filter by file type
+      - name: verdict
+        in: query
+        type: string
+        enum: ['REAL', 'FAKE']
+        description: Filter by verdict
+      - name: model
+        in: query
+        type: string
+        description: Filter by model used
+      - name: sort_by
+        in: query
+        type: string
+        default: 'created_at'
+        description: Column to sort by
+      - name: sort_order
+        in: query
+        type: string
+        enum: ['asc', 'desc']
+        default: 'desc'
+        description: Sort order
+    responses:
+      200:
+        description: List of history items
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+            total:
+              type: integer
+            page:
+              type: integer
+            pages:
+              type: integer
     """
     try:
         page = request.args.get('page', 1, type=int)

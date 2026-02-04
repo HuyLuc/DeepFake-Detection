@@ -45,15 +45,34 @@ def get_history_service():
 def export_json(prediction_id):
     """
     Export prediction as JSON file
-    
-    Args:
-        prediction_id: ID of prediction in history
-    
-    Query params:
-        download: 'true' to download file, 'false' to get file path (default: true)
-    
-    Returns:
-        JSON file download or file path
+    ---
+    tags:
+      - Export
+    parameters:
+      - name: prediction_id
+        in: path
+        type: integer
+        required: true
+        description: ID of prediction in history
+      - name: download
+        in: query
+        type: boolean
+        default: true
+        description: Download as attachment (true) or return path (false)
+    responses:
+      200:
+        description: JSON file download or file path info
+        schema:
+          type: object
+          properties:
+            success:
+               type: boolean
+            file_path:
+               type: string
+            file_name:
+               type: string
+      404:
+        description: Prediction not found
     """
     try:
         # Get prediction from history
@@ -104,15 +123,36 @@ def export_json(prediction_id):
 def export_pdf(prediction_id):
     """
     Export prediction as PDF report
-    
-    Args:
-        prediction_id: ID of prediction in history
-    
-    Query params:
-        download: 'true' to download file, 'false' to get file path (default: true)
-    
-    Returns:
-        PDF file download or file path
+    ---
+    tags:
+      - Export
+    parameters:
+      - name: prediction_id
+        in: path
+        type: integer
+        required: true
+        description: ID of prediction in history
+      - name: download
+        in: query
+        type: boolean
+        default: true
+        description: Download as attachment (true) or return path (false)
+    responses:
+      200:
+        description: PDF file download or file path info
+        schema:
+          type: object
+          properties:
+            success:
+               type: boolean
+            file_path:
+               type: string
+            file_name:
+               type: string
+      404:
+        description: Prediction not found
+      500:
+        description: Server error or missing PDF dependency
     """
     try:
         # Get prediction from history
@@ -167,16 +207,29 @@ def export_pdf(prediction_id):
 @export_api.route('/direct', methods=['POST'])
 def export_direct():
     """
-    Export prediction data directly (without saving to history first)
-    
-    Request body:
-        {
-            "prediction_data": {...},  // Prediction result
-            "format": "json" or "pdf"
-        }
-    
-    Returns:
-        File download
+    Export prediction data directly
+    ---
+    tags:
+      - Export
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            prediction_data:
+              type: object
+              description: Prediction result to export
+            format:
+              type: string
+              enum: ['json', 'pdf']
+              default: 'json'
+    responses:
+      200:
+        description: File download
+      400:
+        description: Invalid input
     """
     try:
         data = request.get_json()
@@ -230,7 +283,15 @@ def export_direct():
 
 @export_api.route('/formats', methods=['GET'])
 def get_export_formats():
-    """Get available export formats"""
+    """
+    Get available export formats
+    ---
+    tags:
+      - Export
+    responses:
+      200:
+        description: List of export formats
+    """
     return jsonify({
         'success': True,
         'formats': [

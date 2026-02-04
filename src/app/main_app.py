@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
+from flasgger import Swagger
 import secrets
 
 # Add project root to path
@@ -95,6 +96,15 @@ def create_app(config=None):
     
     # Database
     init_db(app)
+    
+    # Swagger Documentation
+    app.config['SWAGGER'] = {
+        'title': 'DeepFake Detection API',
+        'uiversion': 3,
+        'version': '2.0.0',
+        'description': 'API documentation for DeepFake Detection System'
+    }
+    Swagger(app)
     
     # ==========================================================================
     # REGISTER BLUEPRINTS
