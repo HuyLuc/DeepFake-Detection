@@ -15,6 +15,8 @@ let batchFiles = []; // For batch processing
 let batchResults = []; // Store batch results
 let isBatchProcessing = false;
 let currentHistoryId = null;
+let currentOriginalImageSrc = null; // For X-Ray Lens
+let currentResult = null; // For Badge Generation
 
 
 let historyPage = 1;
@@ -143,6 +145,9 @@ function initDashboard() {
         resetDashboard();
     });
 
+    // Download Badge Button
+    document.getElementById('download-badge-btn')?.addEventListener('click', generateAndDownloadBadge);
+
     // Heatmap checkbox - show/hide all-frames option
     const heatmapCheckbox = document.getElementById('heatmap-checkbox');
     const allFramesOption = document.getElementById('all-frames-option');
@@ -197,6 +202,7 @@ function handleFileSelect(files) {
     if (validFiles.length === 1) {
         // Single File Mode
         currentFile = validFiles[0];
+        currentOriginalImageSrc = URL.createObjectURL(currentFile);
         initSingleFileUI(currentFile);
     } else {
         // Batch Mode
@@ -383,6 +389,11 @@ function viewBatchResult(index) {
     const result = batchResults[index];
     if (!result) return;
 
+    // Set original image source for X-Ray
+    if (batchFiles[index]) {
+        currentOriginalImageSrc = URL.createObjectURL(batchFiles[index]);
+    }
+
     displayResult(result);
     currentHistoryId = result.history_id;
 
@@ -450,6 +461,7 @@ function callPredictAPI(file, onProgress) {
 function displayResult(result) {
     hideElement('upload-section');
     showElement('result-section');
+    currentResult = result;
 
     const verdict = result.verdict;
     const confidence = result.confidence * 100;
@@ -490,6 +502,18 @@ function displayResult(result) {
 
     // Heatmap display
     const heatmapSection = document.getElementById('heatmap-section');
+
+    // Show/Hide Badge Button
+    const badgeBtn = document.getElementById('download-badge-btn');
+    if (badgeBtn) {
+        if (result.verdict === 'REAL') {
+            badgeBtn.classList.remove('hidden');
+            badgeBtn.style.display = 'inline-flex';
+        } else {
+            badgeBtn.classList.add('hidden');
+            badgeBtn.style.display = 'none';
+        }
+    }
     const heatmapImage = document.getElementById('heatmap-image');
     const heatmapExplanation = document.getElementById('heatmap-explanation');
 
@@ -499,10 +523,27 @@ function displayResult(result) {
     });
 
     if (result.heatmap && result.heatmap.image_base64) {
-        heatmapImage.src = result.heatmap.image_base64;
+        // X-Ray Mode
+        const container = document.querySelector('.heatmap-container');
+        if (container) {
+            container.innerHTML = `
+                <div id="xray-main" class="xray-container">
+                    <img id="xray-original" src="${currentOriginalImageSrc || ''}" class="xray-base-image" alt="Original Image">
+                    <div id="xray-lens" class="xray-lens"></div>
+                    <div class="xray-hint" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; pointer-events: none;">
+                        👆 Di chuột để soi Heatmap
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                initXRayLens('xray-main', 'xray-lens', 'xray-original', result.heatmap.image_base64);
+            }, 200);
+        }
+
         heatmapExplanation.textContent = result.heatmap.explanation || '';
         heatmapSection?.classList.remove('hidden');
-        console.log('🔥 Heatmap displayed');
+        console.log('🔥 Heatmap displayed (X-Ray Mode)');
     } else {
         heatmapSection?.classList.add('hidden');
         console.log('⚠️ No heatmap in result');
@@ -512,9 +553,19 @@ function displayResult(result) {
     const timelineSection = document.getElementById('timeline-section');
     const keyFrameSection = document.getElementById('key-frame-section');
     const allFramesGallery = document.getElementById('all-frames-gallery');
+    const videoContainer = document.getElementById('video-player-container');
+    const videoPlayer = document.getElementById('video-player');
 
     if (result.timeline && result.timeline.length > 0) {
-        renderTimeline(result.timeline, result.stats);
+        // Setup Video Player
+        if (currentOriginalImageSrc && videoPlayer) {
+            videoPlayer.src = currentOriginalImageSrc;
+            videoContainer.classList.remove('hidden');
+        }
+
+        const fps = result.details?.fps || 30; // Default to 30 if missing
+        renderTimeline(result.timeline, result.stats, fps);
+
         timelineSection?.classList.remove('hidden');
         console.log('📈 Timeline displayed');
 
@@ -598,7 +649,7 @@ function displayGalleryFrame(index) {
 // Timeline Chart Instance (for cleanup)
 let timelineChartInstance = null;
 
-function renderTimeline(timeline, stats) {
+function renderTimeline(timeline, stats, fps = 30) {
     // Update stats badges
     if (stats) {
         document.getElementById('timeline-frames').textContent = stats.total_frames || timeline.length;
@@ -658,10 +709,16 @@ function renderTimeline(timeline, stats) {
                             const idx = context.dataIndex;
                             const verdict = verdicts[idx];
                             const conf = confidences[idx].toFixed(1);
-                            return `${verdict}: ${conf}%`;
+                            const frameNum = timeline[idx].frame;
+                            const time = (frameNum / fps).toFixed(2);
+                            return `${verdict}: ${conf}% (Frame ${frameNum} @ ${time}s)`;
                         }
                     }
                 }
+            },
+            interaction: {
+                mode: 'nearest',
+                intersect: true
             },
             scales: {
                 y: {
@@ -695,10 +752,23 @@ function renderTimeline(timeline, stats) {
                 }
             },
             onClick: (event, elements) => {
+                const videoPlayer = document.getElementById('video-player');
+
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const frame = timeline[idx];
-                    alert(`Frame ${frame.frame}: ${frame.verdict} (${(frame.confidence * 100).toFixed(1)}%)`);
+
+                    // Smart Seek Logic
+                    const timestamp = (frame.frame - 1) / fps;
+
+                    if (videoPlayer) {
+                        videoPlayer.currentTime = Math.max(0, timestamp);
+                        videoPlayer.play(); // Auto play when jumping
+                        // Scroll to video if needed
+                        videoPlayer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+
+                    // console.log(`⏩ Jumped to frame ${frame.frame} (${timestamp.toFixed(2)}s)`);
                 }
             }
         }
@@ -1035,3 +1105,183 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize theme toggle on all pages
     initThemeToggle();
 });
+
+// X-Ray Lens Logic
+function initXRayLens(containerId, lensId, imgId, heatmapUrl) {
+    const container = document.getElementById(containerId);
+    const lens = document.getElementById(lensId);
+    const img = document.getElementById(imgId);
+
+    if (!container || !lens || !img) return;
+
+    lens.style.backgroundImage = `url('${heatmapUrl}')`;
+
+    // Optimization variables
+    let rafId = null;
+    let mouseX = 0;
+    let mouseY = 0;
+    let isVisible = false;
+
+    const updatePosition = () => {
+        if (!isVisible) return;
+
+        const rect = container.getBoundingClientRect();
+
+        // Relative coordinates within container
+        // Ensure coords are within container bounds? CSS overflow:hidden handles display
+
+        // Lens dimensions
+        const lensW = lens.offsetWidth;
+        const lensH = lens.offsetHeight;
+
+        // Position lens centered on mouse
+        // Note: mouseX/Y are client coordinates
+        const x = mouseX - rect.left;
+        const y = mouseY - rect.top;
+
+        lens.style.left = (x - lensW / 2) + 'px';
+        lens.style.top = (y - lensH / 2) + 'px';
+
+        // Update background position
+        const imgW = img.offsetWidth;
+        const imgH = img.offsetHeight;
+
+        lens.style.backgroundSize = `${imgW}px ${imgH}px`;
+        lens.style.backgroundPosition = `-${x - lensW / 2}px -${y - lensH / 2}px`;
+
+        rafId = null;
+    };
+
+    const onMouseMove = (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+
+        if (!rafId) {
+            rafId = requestAnimationFrame(updatePosition);
+        }
+    };
+
+    const showLens = () => {
+        isVisible = true;
+        lens.style.display = 'block';
+    };
+
+    const hideLens = () => {
+        isVisible = false;
+        lens.style.display = 'none';
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+    };
+
+    container.addEventListener('mousemove', onMouseMove);
+    container.addEventListener('mouseenter', showLens);
+    container.addEventListener('mouseleave', hideLens);
+}
+
+// =============================================================================
+// BADGE GENERATION LOGIC
+// =============================================================================
+async function generateAndDownloadBadge() {
+    if (!currentOriginalImageSrc || !currentResult) {
+        alert('Không có dữ liệu để tạo chứng nhận!');
+        return;
+    }
+
+    showLoading('Đang tạo chứng nhận...');
+
+    try {
+        let sourceElement;
+        let width, height;
+
+        // Check if video
+        if (currentResult.file_info && currentResult.file_info.file_type === 'video') {
+            const video = document.getElementById('video-player');
+            if (!video || video.readyState < 2) { // HAVE_CURRENT_DATA
+                alert('Video chưa sẵn sàng. Vui lòng đợi video load hoặc bấm Play.');
+                return;
+            }
+            sourceElement = video;
+            width = video.videoWidth;
+            height = video.videoHeight;
+        } else {
+            // Image logic
+            const img = new Image();
+            // img.crossOrigin = "Anonymous"; 
+            img.src = currentOriginalImageSrc;
+
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = (e) => {
+                    console.error('Image load error:', e);
+                    reject(new Error('Không thể tải ảnh gốc (Blob URL)'));
+                };
+            });
+            sourceElement = img;
+            width = img.naturalWidth;
+            height = img.naturalHeight;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // Draw source (image or video frame)
+        ctx.drawImage(sourceElement, 0, 0, width, height);
+
+        // Badge Configurations
+        // Scale badge relative to image size
+        const minDimension = Math.min(canvas.width, canvas.height);
+        const badgeSize = Math.max(150, minDimension * 0.2);
+        const padding = badgeSize * 0.2;
+
+        // Position: Bottom Right
+        const x = canvas.width - badgeSize - padding;
+        const y = canvas.height - badgeSize - padding;
+
+        // Draw Badge Background (Circle)
+        ctx.beginPath();
+        ctx.arc(x + badgeSize / 2, y + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(46, 213, 115, 0.9)'; // Green
+        ctx.fill();
+        ctx.lineWidth = badgeSize * 0.05;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+
+        // Draw Shield Icon (Simplified using text for cross-platform ease)
+        ctx.fillStyle = '#fff';
+        const fontSizeIcon = badgeSize * 0.4;
+        ctx.font = `${fontSizeIcon}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🛡️', x + badgeSize / 2, y + badgeSize / 2 - badgeSize * 0.15);
+
+        // Draw Text "VERIFIED REAL"
+        ctx.font = `bold ${badgeSize * 0.13}px Arial`;
+        ctx.fillText('VERIFIED REAL', x + badgeSize / 2, y + badgeSize / 2 + badgeSize * 0.2);
+
+        // Draw Date
+        const date = new Date().toLocaleDateString('vi-VN');
+        ctx.font = `${badgeSize * 0.1}px Arial`;
+        ctx.fillText(date, x + badgeSize / 2, y + badgeSize / 2 + badgeSize * 0.35);
+
+        // Draw App Name (Small arc text or just bottom text)
+        ctx.font = `italic ${badgeSize * 0.08}px Arial`;
+        ctx.fillText('DeepFake Detector', x + badgeSize / 2, y + badgeSize / 2 + badgeSize * 0.55);
+
+        // Export
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `verified_${currentResult.file_info?.file_name || 'image'}.png`;
+        link.href = dataUrl;
+        link.click();
+
+    } catch (e) {
+        console.error('Badge generation error:', e);
+        alert('Lỗi khi tạo chứng nhận: ' + e.message);
+    } finally {
+        hideLoading();
+    }
+}

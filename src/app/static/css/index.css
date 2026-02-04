@@ -1281,3 +1281,85 @@ tr:hover {
 .icon-spin {
     animation: spin 1s linear infinite;
 }
+
+/* ===========================================================================
+   X-Ray Lens Effect
+   =========================================================================== */
+
+.xray-container {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    cursor: none;
+    /* Hide default cursor when using lens */
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+}
+
+.xray-base-image {
+    display: block;
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.xray-lens {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    border: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.5);
+    background-repeat: no-repeat;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+
+    /* Optimization */
+    will-change: left, top, background-position;
+
+    /* Glass effect for the lens rim */
+    backdrop-filter: brightness(1.1);
+}
+
+/* =============================================================================
+   UTILITIES
+   ============================================================================= */
+.hidden {
+    display: none !important;
+}
+
+.visible {
+    display: block !important;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.xray-lens::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+}
+
+.icon-svg.sm {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-view-details {
+    padding: 2px 8px;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
