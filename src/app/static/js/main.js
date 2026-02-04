@@ -11,6 +11,8 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
 // Global state
 let currentFile = null;
+let batchFiles = []; // For batch processing
+let isBatchProcessing = false;
 let currentHistoryId = null;
 let historyPage = 1;
 let historyFilters = {};
@@ -91,7 +93,7 @@ function initDashboard() {
     // File input change
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
-            handleFileSelect(e.target.files[0]);
+            handleFileSelect(e.target.files);
         }
     });
 
@@ -109,7 +111,7 @@ function initDashboard() {
         e.preventDefault();
         uploadZone.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
-            handleFileSelect(e.dataTransfer.files[0]);
+            handleFileSelect(e.dataTransfer.files);
         }
     });
 
@@ -129,6 +131,12 @@ function initDashboard() {
     document.getElementById('export-json-btn')?.addEventListener('click', () => exportResult('json'));
     document.getElementById('export-pdf-btn')?.addEventListener('click', () => exportResult('pdf'));
 
+    // Clear batch button
+    document.getElementById('clear-batch-btn')?.addEventListener('click', () => {
+        batchFiles = [];
+        resetDashboard();
+    });
+
     // Heatmap checkbox - show/hide all-frames option
     const heatmapCheckbox = document.getElementById('heatmap-checkbox');
     const allFramesOption = document.getElementById('all-frames-option');
@@ -144,75 +152,125 @@ function initDashboard() {
     });
 }
 
-function handleFileSelect(file) {
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-        alert('File quá lớn! Giới hạn: 100MB');
+function handleFileSelect(files) {
+    // If single file (from old calls or only 1 selected)
+    if (files instanceof File) {
+        files = [files];
+    }
+
+    // Convert FileList to Array
+    const fileList = Array.from(files);
+
+    // Validation
+    const validFileTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/avi', 'video/quicktime', 'video/webm'];
+    const validFiles = fileList.filter(file => {
+        if (file.size > MAX_FILE_SIZE) {
+            console.warn(`File ${file.name} quá lớn!`);
+            return false;
+        }
+        if (!validFileTypes.some(t => file.type.includes(t.split('/')[1]))) {
+            console.warn(`File ${file.name} không hỗ trợ!`);
+            return false;
+        }
+        return true;
+    });
+
+    if (validFiles.length === 0) {
+        alert('Không có file hợp lệ!');
         return;
     }
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/avi', 'video/quicktime', 'video/webm'];
-    if (!validTypes.some(t => file.type.includes(t.split('/')[1]))) {
-        alert('Loại file không được hỗ trợ!');
-        return;
+    if (validFiles.length === 1) {
+        // Single File Mode
+        currentFile = validFiles[0];
+        initSingleFileUI(currentFile);
+    } else {
+        // Batch Mode
+        batchFiles = validFiles;
+        initBatchUI(batchFiles);
     }
 
-    currentFile = file;
+    document.getElementById('analyze-btn').disabled = false;
+    // Update button text accordingly
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (validFiles.length > 1) {
+        analyzeBtn.innerHTML = `
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Phân tích Batch (${validFiles.length} files)
+        `;
+    } else {
+        analyzeBtn.innerHTML = `
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Phân tích
+        `;
+    }
+}
 
-    // Update UI
+function initSingleFileUI(file) {
     const uploadZone = document.getElementById('upload-zone');
     uploadZone.classList.add('has-file');
 
     document.getElementById('file-name').textContent = file.name;
     document.getElementById('file-size').textContent = formatFileSize(file.size);
-    document.getElementById('file-icon').textContent = file.type.startsWith('video') ? '🎬' : '🖼️';
+    document.getElementById('file-icon').innerHTML = file.type.startsWith('video') ?
+        '<svg class="icon-svg" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>' :
+        '<svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
 
     showElement('file-preview');
-    document.getElementById('analyze-btn').disabled = false;
+    hideElement('batch-queue-section');
+}
+
+function initBatchUI(files) {
+    const uploadZone = document.getElementById('upload-zone');
+    uploadZone.classList.add('has-file');
+
+    hideElement('file-preview');
+    showElement('batch-queue-section');
+
+    document.getElementById('batch-count').textContent = files.length;
+    document.getElementById('batch-progress-text').textContent = `0/${files.length}`;
+    document.getElementById('batch-progress-percent').textContent = '0%';
+    document.getElementById('batch-progress-bar').style.width = '0%';
+
+    // Render list
+    const tbody = document.getElementById('batch-queue-tbody');
+    tbody.innerHTML = files.map((file, index) => `
+        <tr id="batch-item-${index}">
+            <td>${file.name}</td>
+            <td>${formatFileSize(file.size)}</td>
+            <td><span class="status-badge status-pending" id="status-${index}">Wait</span></td>
+            <td><span id="result-${index}">-</span></td>
+        </tr>
+    `).join('');
 }
 
 function clearFile() {
     currentFile = null;
+    batchFiles = [];
     document.getElementById('file-input').value = '';
     document.getElementById('upload-zone').classList.remove('has-file');
     hideElement('file-preview');
+    hideElement('batch-queue-section');
+    hideElement('result-section');
     document.getElementById('analyze-btn').disabled = true;
+    document.getElementById('analyze-btn').innerHTML = `
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Phân tích
+    `;
 }
 
 async function analyzefile() {
-    if (!currentFile) return;
-
-    const model = document.getElementById('model-select').value;
-    const fileType = currentFile.type.startsWith('video') ? 'video' : 'image';
-    const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
-    const allFramesHeatmap = document.getElementById('all-frames-checkbox')?.checked || false;
-
-    console.log('📤 Request params:', { model, fileType, generateHeatmap, allFramesHeatmap });
-
-    // Prepare form data
-    const formData = new FormData();
-    formData.append('file', currentFile);
-    formData.append('model', model);
-    formData.append('save_history', 'true');
-    formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
-    formData.append('all_frames_heatmap', allFramesHeatmap ? 'true' : 'false');
-
-    // Adjust loading message based on options
-    let loadingMsg = `Đang phân tích ${fileType === 'video' ? 'video' : 'ảnh'}...`;
-    if (allFramesHeatmap && fileType === 'video') {
-        loadingMsg = 'Đang tạo heatmap cho tất cả frames... (có thể mất vài phút)';
+    if (batchFiles.length > 0) {
+        await processBatchQueue();
+    } else if (currentFile) {
+        await processSingleFile(currentFile);
     }
-    showLoading(loadingMsg);
+}
 
+async function processSingleFile(file) {
+    showLoading(`Đang phân tích ${file.type.startsWith('video') ? 'video' : 'ảnh'}...`);
     try {
-        const response = await fetch(`${API_BASE}/predict`, {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-
+        const result = await callPredictAPI(file);
         if (result.success) {
             displayResult(result);
             currentHistoryId = result.history_id;
@@ -225,6 +283,83 @@ async function analyzefile() {
     } finally {
         hideLoading();
     }
+}
+
+async function processBatchQueue() {
+    isBatchProcessing = true;
+    document.getElementById('analyze-btn').disabled = true;
+
+    let processedCount = 0;
+
+    // Helper to update progress
+    const updateProgress = () => {
+        processedCount++;
+        const percent = Math.round((processedCount / batchFiles.length) * 100);
+        document.getElementById('batch-progress-text').textContent = `${processedCount}/${batchFiles.length}`;
+        document.getElementById('batch-progress-percent').textContent = `${percent}%`;
+        document.getElementById('batch-progress-bar').style.width = `${percent}%`;
+    };
+
+    for (let i = 0; i < batchFiles.length; i++) {
+        const file = batchFiles[i];
+
+        // Update item status to Processing
+        const statusEl = document.getElementById(`status-${i}`);
+        statusEl.className = 'status-badge status-processing icon-spin';
+        statusEl.textContent = '⟳';
+
+        // Scroll to item
+        document.getElementById(`batch-item-${i}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        try {
+            const result = await callPredictAPI(file);
+
+            if (result.success) {
+                statusEl.className = 'status-badge status-done';
+                statusEl.textContent = 'Done';
+
+                const verdictClass = result.verdict === 'FAKE' ? 'text-fake' : 'text-real';
+                const verdictColor = result.verdict === 'FAKE' ? 'var(--color-fake)' : 'var(--color-real)';
+                document.getElementById(`result-${i}`).innerHTML =
+                    `<span style="color: ${verdictColor}; font-weight: bold;">${result.verdict}</span> (${(result.confidence * 100).toFixed(0)}%)`;
+            } else {
+                statusEl.className = 'status-badge status-error';
+                statusEl.textContent = 'Err';
+                document.getElementById(`result-${i}`).textContent = 'Error';
+            }
+        } catch (error) {
+            statusEl.className = 'status-badge status-error';
+            statusEl.textContent = 'Err';
+            document.getElementById(`result-${i}`).textContent = 'Failed';
+        }
+
+        updateProgress();
+    }
+
+    isBatchProcessing = false;
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('analyze-btn').textContent = 'Xong! Phân tích lại';
+}
+
+async function callPredictAPI(file) {
+    const model = document.getElementById('model-select').value;
+    const fileType = file.type.startsWith('video') ? 'video' : 'image';
+    const generateHeatmap = document.getElementById('heatmap-checkbox')?.checked || false;
+    const allFramesHeatmap = document.getElementById('all-frames-checkbox')?.checked || false;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('model', model);
+    formData.append('save_history', 'true');
+    formData.append('generate_heatmap', generateHeatmap ? 'true' : 'false');
+    formData.append('all_frames_heatmap', allFramesHeatmap ? 'true' : 'false');
+
+    const response = await fetch(`${API_BASE}/predict`, {
+        method: 'POST',
+        body: formData
+    });
+
+    return await response.json();
 }
 
 function displayResult(result) {
@@ -634,9 +769,15 @@ function renderHistoryTable(items) {
             <td><span class="badge badge-${item.verdict?.toLowerCase()}">${item.verdict}</span></td>
             <td>${((item.confidence || 0) * 100).toFixed(1)}%</td>
             <td>
-                <button class="btn btn-secondary btn-sm action-export-json" data-id="${item.id}">📄</button>
-                <button class="btn btn-secondary btn-sm action-export-pdf" data-id="${item.id}">📑</button>
-                <button class="btn btn-danger btn-sm action-delete" data-id="${item.id}">🗑️</button>
+                <button class="btn btn-secondary btn-sm action-export-json" data-id="${item.id}" title="Xuất JSON">
+                    <svg class="icon-svg sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                </button>
+                <button class="btn btn-secondary btn-sm action-export-pdf" data-id="${item.id}" title="Xuất PDF">
+                    <svg class="icon-svg sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                </button>
+                <button class="btn btn-danger btn-sm action-delete" data-id="${item.id}" title="Xóa">
+                    <svg class="icon-svg sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
             </td>
         </tr>
     `).join('');
