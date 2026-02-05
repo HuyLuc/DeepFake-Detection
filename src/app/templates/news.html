@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} - Tin Tức DeepFake{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Header Section -->
+    <div class="text-center mb-4">
+        <h2>
+            <span class="text-gradient">Tin Tức DeepFake & AI</span>
+        </h2>
+        <p class="text-secondary">
+            Cập nhật thông tin mới nhất về công nghệ và cảnh báo bảo mật
+        </p>
+
+        <!-- Search Bar -->
+        <div class="card mt-3" style="max-width: 600px; margin-left: auto; margin-right: auto; padding: 1rem;">
+            <div class="flex-center">
+                <span class="text-secondary" style="font-size: 1.2rem; margin-right: 10px;">🔍</span>
+                <input type="text" id="news-search" placeholder="Tìm kiếm tin tức..."
+                    style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-primary); outline: none;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="text-center mt-5">
+        <div class="loader"></div>
+        <p class="mt-2 text-muted">Đang tải tin tức...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-message" class="alert alert-error hidden mx-auto" style="max-width: 600px;">
+        Không thể tải tin tức. Vui lòng thử lại sau.
+    </div>
+
+    <!-- News Grid -->
+    <div id="news-grid" class="grid grid-3 hidden" style="gap: 1.5rem;">
+        <!-- News items injected here -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="text-center hidden mt-5">
+        <p class="text-muted">Không tìm thấy tin tức nào phù hợp.</p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const loading = document.getElementById('loading');
+        const newsGrid = document.getElementById('news-grid');
+        const errorMsg = document.getElementById('error-message');
+        const searchInput = document.getElementById('news-search');
+        const emptyState = document.getElementById('empty-state');
+
+        let allNews = [];
+
+        // Helper: Relative Time
+        function timeAgo(dateString) {
+            try {
+                const [datePart, timePart] = dateString.split(' ');
+                const [day, month, year] = datePart.split('/');
+                const [hour, minute] = timePart.split(':');
+                const date = new Date(year, month - 1, day, hour, minute);
+                const now = new Date();
+                const seconds = Math.floor((now - date) / 1000);
+
+                let interval = seconds / 31536000;
+                if (interval > 1) return Math.floor(interval) + " năm trước";
+                interval = seconds / 2592000;
+                if (interval > 1) return Math.floor(interval) + " tháng trước";
+                interval = seconds / 86400;
+                if (interval > 1) return Math.floor(interval) + " ngày trước";
+                interval = seconds / 3600;
+                if (interval > 1) return Math.floor(interval) + " giờ trước";
+                interval = seconds / 60;
+                if (interval > 1) return Math.floor(interval) + " phút trước";
+                return "Vừa xong";
+            } catch (e) { return dateString; }
+        }
+
+        // Render News
+        function renderNews(items) {
+            if (items.length === 0) {
+                newsGrid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            newsGrid.classList.remove('hidden');
+
+            newsGrid.innerHTML = items.map(item => `
+            <a href="${item.link}" target="_blank" class="card hover-card" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; height: 100%; transition: transform 0.2s;">
+                <div style="flex: 1;">
+                    <div class="flex-between mb-2">
+                        <span class="badge badge-info" style="font-size: 0.75rem;">${item.source}</span>
+                        <span class="text-muted" style="font-size: 0.8rem;">${timeAgo(item.published)}</span>
+                    </div>
+                    <h3 style="font-size: 1.1rem; line-height: 1.4; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 600;">
+                        ${highlightText(item.title, searchInput.value)}
+                    </h3>
+                </div>
+                <div class="mt-3 pt-2" style="border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; align-items: center; color: var(--accent-primary); font-size: 0.9rem;">
+                    Đọc tiếp
+                    <svg class="icon-svg sm ml-1" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+        `).join('');
+        }
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<span style="background: rgba(255, 165, 0, 0.3); color: inherit;">$1</span>');
+        }
+
+        try {
+            const response = await fetch('/api/news');
+            const data = await response.json();
+            if (data.success) {
+                allNews = data.items;
+                renderNews(allNews);
+                loading.classList.add('hidden');
+            } else throw new Error(data.error);
+        } catch (e) {
+            console.error(e);
+            loading.classList.add('hidden');
+            errorMsg.classList.remove('hidden');
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = allNews.filter(item =>
+                item.title.toLowerCase().includes(query) ||
+                item.source.toLowerCase().includes(query)
+            );
+            renderNews(filtered);
+        });
+    });
+</script>
+
+<style>
+    .hover-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--accent-primary);
+    }
+
+    .loader {
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top: 3px solid var(--accent-primary);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}

@@ -1,10 +1,16 @@
-# 🔍 DeepFake Detection Project
+# 🛡️ DeepFake Detection System V2.0
+> **Bảo vệ sự thật trong kỷ nguyên số với công nghệ AI tiên tiến.**
 
-Dự án phát hiện Deepfake sử dụng Deep Learning với **2 kiến trúc** model khác nhau:
-- 🔵 **Standard**: EfficientNet-B4 (nhanh, nhẹ)
-- 🟢 **Advanced**: EfficientNet + LSTM + Swin Transformer (độ chính xác cao)
+**DeepFake Detection** là hệ thống phân tích video thông minh, sử dụng **Deep Learning** để phát hiện nội dung giả mạo với độ chính xác cao. Dự án kết hợp sức mạnh của **EfficientNet** và **Swin Transformer** để phân tích cả không gian và thời gian, giúp nhận diện những dấu vết chỉnh sửa tinh vi nhất.
 
-Hệ thống phân loại video thành **REAL** (thật) và **FAKE** (giả mạo) thông qua việc phân tích các frame khuôn mặt.
+Điểm đột phá của hệ thống là khả năng **Explainable AI (XAI)** - không chỉ đưa ra kết quả mà còn giải thích lý do:
+*   🔍 **X-Ray Lens (Heatmap)**: Soi chiếu vùng khuôn mặt bị can thiệp.
+*   📉 **Smart Video Timeline**: Phân tích diễn biến độ giả mạo theo từng giây.
+*   🏆 **Verification Badge**: Cấp chứng chỉ "Verified Real" cho nội dung sạch.
+
+Phát triển với 2 kiến trúc linh hoạt:
+- 🔵 **Standard Mode**: Tốc độ cao, nhẹ (EfficientNet-B4).
+- 🟢 **Advanced Mode**: Độ chính xác tối đa (Ensemble Spatial-Temporal).
 
 ---
 

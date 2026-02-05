@@ -25,6 +25,7 @@ from src.app.models.database import init_db
 # Import blueprints
 from src.app.api.routes import api
 from src.app.api.export_routes import export_api
+from src.app.api.news_routes import news_bp
 
 # =============================================================================
 # LOGGING SETUP
@@ -111,6 +112,7 @@ def create_app(config=None):
     # ==========================================================================
     app.register_blueprint(api)
     app.register_blueprint(export_api)
+    app.register_blueprint(news_bp)
     
     logger.info("✅ Registered API blueprints")
     
@@ -132,6 +134,11 @@ def create_app(config=None):
     def about():
         """About page"""
         return render_template('about.html')
+
+    @app.route('/news')
+    def news():
+        """News page"""
+        return render_template('news.html')
     
     # ==========================================================================
     # ERROR HANDLERS
