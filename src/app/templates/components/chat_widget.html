@@ -1,0 +1,60 @@
+<!-- Chat Widget -->
+<div id="chat-widget" class="chat-widget closed">
+    <!-- Toggle Button -->
+    <button id="chat-toggle" class="chat-toggle-btn shadow-glow">
+        <div class="chat-icon">
+            <svg class="icon-svg xl" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+        </div>
+        <div class="close-icon hidden">
+            <svg class="icon-svg xl" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </div>
+    </button>
+
+    <!-- Chat Window -->
+    <div class="chat-window shadow-lg glass-panel">
+        <div class="chat-header">
+            <div class="flex-center" style="gap: 10px;">
+                <div class="avatar-bot">
+                    <img src="{{ url_for('static', filename='images/logos/logo.png') }}" alt="Bot"
+                        style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+                <div>
+                    <h4 class="mb-0">Assistant</h4>
+                    <span class="status-dot online"></span> <small class="text-muted">Sẵn sàng hỗ trợ</small>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-messages" class="chat-messages">
+            <!-- Welcome Message -->
+            <div class="message bot animate-fade-in">
+                <div class="message-content">
+                    Xin chào! Tôi là trợ lý ảo chuyên về Deepfake. Bạn cần hỗ trợ gì không?
+                    <br><br>
+                    Ví dụ:
+                    <ul class="suggestion-list">
+                        <li onclick="sendSuggestion('Deepfake là gì?')">Deepfake là gì?</li>
+                        <li onclick="sendSuggestion('Cách nhận biết lừa đảo')">Cách nhận biết lừa đảo?</li>
+                        <li onclick="sendSuggestion('Tin tức mới nhất')">Tin tức mới nhất</li>
+                    </ul>
+                </div>
+                <div class="message-time">Just now</div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Nhập câu hỏi..." autocomplete="off">
+            <button id="send-btn" class="btn-icon">
+                <svg class="icon-svg" viewBox="0 0 24 24">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>

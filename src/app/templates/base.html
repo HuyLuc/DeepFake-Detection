@@ -94,6 +94,11 @@
     <!-- Chart.js for Timeline visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <!-- Chat Widget Integration -->
+    {% include 'components/chat_widget.html' %}
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
     {% block extra_js %}{% endblock %}
 </body>
 
