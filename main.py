@@ -10,6 +10,10 @@ Có 2 kiến trúc training:
 import argparse
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Thêm thư mục project và src vào Python path
 project_dir = os.path.dirname(os.path.abspath(__file__))
