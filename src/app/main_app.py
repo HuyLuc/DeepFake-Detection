@@ -1,4 +1,4 @@
-# src/app/main_app.py
+﻿# src/app/main_app.py
 """
 DeepFake Detection Web App V2.0 (Renamed from app_v2.py)
 Main Flask Application with API routes, database, and modern features
