@@ -98,7 +98,11 @@ def run_temporal_training(
         torch.backends.cudnn.benchmark = True
     
     # =========================================================================
-    # 1. Setup Data
+    # BƯỚC 1: TẢI DỮ LIỆU ĐẶC THÙ (TEMPORAL DATA)
+    # Khác với Standard Model (từng ảnh rời rạc), ở mô hình Advanced này chúng ta 
+    # nạp dữ liệu vào AI dưới dạng "Chuỗi thời gian" (Sequence).
+    # Ví dụ: sequence_length=10 nghĩa là một lần model đưa mắt nhìn, nó xem luôn 10 frame video liên tiếp 
+    # chuyển động như thế nào để tìm ra các lỗi 'chớp giật' cực nhỏ.
     # =========================================================================
     print("\n📂 Loading datasets...")
     
@@ -162,7 +166,11 @@ def run_temporal_training(
     print(f"   Val: {len(val_dataset)} videos ({len(val_loader)} batches)")
     
     # =========================================================================
-    # 2. Setup Model
+    # BƯỚC 2: KHỞI TẠO KIẾN TRÚC AI NÂNG CAO (MODEL ARCHITECTURE)
+    # Tùy theo tham số model_type, ta có:
+    # - temporal: Dùng mạng LSTM (Bộ nhớ ngắn/dài hạn) để xâu chuỗi thứ tự các khung hình.
+    # - ensemble: "Hai đánh một", ghép 2 model (Ví dụ: EfficientNet nhìn chi tiết + Swin nhìn toàn cảnh).
+    # - temporal_ensemble: ĐỈNH NHẤT - Vừa ghép 2 mạng CNN lại, vừa có đuôi tuần tự LSTM để soi tính logic của chuyển động.
     # =========================================================================
     print(f"\n🏗️ Building model: {model_type}...")
     
@@ -221,7 +229,10 @@ def run_temporal_training(
     print(f"   Trainable params: {trainable_params:,}")
     
     # =========================================================================
-    # 3. Setup Training Components
+    # BƯỚC 3: CÁC CÔNG CỤ TỐI ƯU HÓA QUÁ TRÌNH HỌC (TRAINING COMPONENTS)
+    # - Optimizer (AdamW): Giống như bánh lái, giúp AI từ từ cập nhật số liệu sửa các lỗi sai.
+    # - Scheduler (CosineAnnealing): Giống như chân ga, điều chỉnh tốc độ học chậm dần lúc sát vớt sự hoàn hảo.
+    # - Class weights: Giống Standard Model, phạt thẻ đỏ khi học tủ và đoán sai các trường hợp lớp ít xuất hiện.
     # =========================================================================
     print("\n⚙️ Setting up training...")
     
@@ -268,7 +279,8 @@ def run_temporal_training(
         print(f"   Resuming from epoch {start_epoch}, best acc: {best_val_acc:.4f}")
     
     # =========================================================================
-    # 4. Training Loop
+    # BƯỚC 4: VÒNG LẶP HUẤN LUYỆN DỮ LIỆU ĐỘNG (EPOCHS LOOP)
+    # Mỗi vòng (Epoch) bao gồm một lượt Train cập nhật não bộ và một lượt Validation test nghiêm túc.
     # =========================================================================
     print("\n" + "=" * 60)
     print("🏃 STARTING TRAINING")
@@ -291,7 +303,10 @@ def run_temporal_training(
         print(f"{'='*40}")
         
         # =====================================================================
-        # Training Phase
+        # PHASE 1: HUẤN LUYỆN (TRAINING PHASE)
+        # Bật model.train(). Chúng tôi sử dụng kỹ thuật 'Mixed Precision' (autocast). 
+        # Hiểu đơn giản: Thay vì tốn tận 32-bit (FP32) ép GPU tính cực nhọc, ta xài dạng 16-bit. 
+        # Nó giúp máy chạy nhanh cấp tốc, tiết kiệm 1 nửa VRAM nhưng AI vẫn duy trì thông minh đỉnh cao!
         # =====================================================================
         model.train()
         train_loss = 0.0
@@ -337,7 +352,9 @@ def run_temporal_training(
         train_acc = train_correct / train_total
         
         # =====================================================================
-        # Validation Phase
+        # PHASE 2: KIỂM ĐỊNH MÔ HÌNH (VALIDATION PHASE)
+        # Vẫn nạp một loạt chuỗi 10 frames, nhưng set model.eval() tước đi quyền "tự sửa weights".
+        # AI lúc này chỉ tập trung dự đoán thật. Nếu điểm đánh giá này thấp nhưng train cao -> Model có xu hướng 'học thuộc vẹt'!
         # =====================================================================
         model.eval()
         val_loss = 0.0

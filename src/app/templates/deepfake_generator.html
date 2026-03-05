@@ -1,0 +1,517 @@
+{% extends 'base.html' %}
+
+{% block title %}Tạo Deepfake Demo - {{ app_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================================ */
+    /* DEEPFAKE GENERATOR PAGE STYLES                               */
+    /* ============================================================ */
+
+    .generator-hero {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .generator-hero h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24, #e056fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+
+    .generator-hero p {
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+
+    /* Upload Area */
+    .upload-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: var(--bg-card);
+        margin-bottom: 2rem;
+        position: relative;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+        border-color: #ee5a24;
+        background: rgba(238, 90, 36, 0.05);
+        transform: translateY(-2px);
+    }
+
+    .upload-zone .upload-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .upload-zone .upload-text {
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .upload-zone .upload-hint {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+    }
+
+    .upload-zone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    /* Preview original */
+    .original-preview {
+        text-align: center;
+        margin-bottom: 2rem;
+        display: none;
+    }
+
+    .original-preview img {
+        max-width: 300px;
+        max-height: 300px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        object-fit: contain;
+    }
+
+    .original-preview .original-label {
+        display: inline-block;
+        margin-top: 0.75rem;
+        padding: 0.25rem 1rem;
+        background: #27ae60;
+        color: white;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    /* Generate Button */
+    .btn-generate {
+        display: block;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto 2rem;
+        padding: 0.875rem 2rem;
+        background: linear-gradient(135deg, #ee5a24, #e056fd);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-generate:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(238, 90, 36, 0.4);
+    }
+
+    .btn-generate:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* Results Grid 2x2 */
+    .results-section {
+        display: none;
+    }
+
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .results-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Result Card */
+    .result-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .result-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .result-card .card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        background: rgba(238, 90, 36, 0.05);
+    }
+
+    .result-card .card-header .method-icon {
+        font-size: 1.5rem;
+    }
+
+    .result-card .card-header .method-name {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text-primary);
+    }
+
+    .result-card .card-header .method-desc {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+
+    .result-card .card-image {
+        position: relative;
+        background: #111;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 250px;
+    }
+
+    .result-card .card-image img {
+        width: 100%;
+        max-height: 350px;
+        object-fit: contain;
+    }
+
+    /* Card Actions */
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .card-actions .btn-action {
+        flex: 1;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    .btn-download {
+        background: rgba(46, 125, 50, 0.1);
+        color: #2e7d32;
+    }
+
+    .btn-download:hover {
+        background: #2e7d32;
+        color: white;
+    }
+
+    .btn-test {
+        background: rgba(21, 101, 192, 0.1);
+        color: #1565c0;
+    }
+
+    .btn-test:hover {
+        background: #1565c0;
+        color: white;
+    }
+
+    /* Loading Spinner */
+    .generating-spinner {
+        display: none;
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .generating-spinner .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid var(--border-color);
+        border-top: 4px solid #ee5a24;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Warning banner */
+    .warning-banner {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+    }
+
+    .warning-banner .warn-icon {
+        font-size: 1.5rem;
+    }
+
+    .warning-banner .warn-text {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="generator-hero">
+    <h1>🎭 Tạo Ảnh Deepfake Demo</h1>
+    <p>Tải lên ảnh chân dung và hệ thống sẽ mô phỏng 4 phương pháp giả mạo phổ biến từ FaceForensics++ để bạn kiểm thử.
+    </p>
+</div>
+
+<!-- Warning -->
+<div class="warning-banner">
+    <span class="warn-icon">⚠️</span>
+    <span class="warn-text">
+        <strong>Chỉ dành cho mục đích nghiên cứu và kiểm thử.</strong>
+        Các ảnh được tạo ra là mô phỏng hiệu ứng deepfake, không phải deepfake thực.
+        Vui lòng không sử dụng cho mục đích xấu.
+    </span>
+</div>
+
+<!-- Upload Zone -->
+<div class="upload-zone" id="uploadZone">
+    <div class="upload-icon">📷</div>
+    <div class="upload-text">Kéo thả ảnh vào đây hoặc click để chọn</div>
+    <div class="upload-hint">Hỗ trợ: PNG, JPG, JPEG, BMP, WEBP</div>
+    <input type="file" id="fileInput" accept="image/png,image/jpeg,image/jpg,image/bmp,image/webp">
+</div>
+
+<!-- Original Preview -->
+<div class="original-preview" id="originalPreview">
+    <img id="originalImage" src="" alt="Ảnh gốc">
+    <div><span class="original-label">✅ Ảnh gốc</span></div>
+</div>
+
+<!-- Generate Button -->
+<button class="btn-generate" id="btnGenerate" disabled>🚀 Tạo 4 ảnh Deepfake</button>
+
+<!-- Loading Spinner -->
+<div class="generating-spinner" id="spinner">
+    <div class="spinner"></div>
+    <div style="color: var(--text-secondary); font-weight: 600;">Đang tạo ảnh giả mạo... Vui lòng chờ</div>
+</div>
+
+<!-- Results Section -->
+<div class="results-section" id="resultsSection">
+    <h2 style="text-align:center; margin-bottom:0.5rem; color: var(--text-primary);">📊 Kết quả 4 phương pháp giả mạo
+    </h2>
+    <p style="text-align:center; color: var(--text-secondary); margin-bottom:1rem; font-size:0.9rem;">
+        Click <strong>"Tải về"</strong> để lưu ảnh, hoặc <strong>"Test ngay"</strong> để kiểm tra bằng AI nhận diện.
+    </p>
+    <div class="results-grid" id="resultsGrid">
+        <!-- Cards will be inserted by JavaScript -->
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // =============================================================
+        // DOM ELEMENTS
+        // =============================================================
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const originalPreview = document.getElementById('originalPreview');
+        const originalImage = document.getElementById('originalImage');
+        const btnGenerate = document.getElementById('btnGenerate');
+        const spinner = document.getElementById('spinner');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsGrid = document.getElementById('resultsGrid');
+
+        let selectedFile = null;
+
+        // =============================================================
+        // UPLOAD HANDLING
+        // =============================================================
+
+        // Drag & drop effects
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Click to select
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Validate
+            const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/webp'];
+            if (!allowed.includes(file.type)) {
+                alert('Định dạng không hỗ trợ. Vui lòng chọn ảnh PNG, JPG, BMP hoặc WEBP.');
+                return;
+            }
+
+            selectedFile = file;
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalImage.src = e.target.result;
+                originalPreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Enable button
+            btnGenerate.disabled = false;
+
+            // Hide previous results
+            resultsSection.style.display = 'none';
+        }
+
+        // =============================================================
+        // GENERATE DEEPFAKES
+        // =============================================================
+        btnGenerate.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // UI State: Loading
+            btnGenerate.disabled = true;
+            btnGenerate.textContent = '⏳ Đang xử lý...';
+            spinner.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('/api/deepfake-gen/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    renderResults(data.results);
+                } else {
+                    alert('❌ Lỗi: ' + (data.error || 'Không thể tạo ảnh giả mạo.'));
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert('❌ Lỗi kết nối server. Vui lòng thử lại.');
+            } finally {
+                // Restore button
+                spinner.style.display = 'none';
+                btnGenerate.disabled = false;
+                btnGenerate.textContent = '🚀 Tạo 4 ảnh Deepfake';
+            }
+        });
+
+        // =============================================================
+        // RENDER RESULTS (Grid 2x2)
+        // =============================================================
+        function renderResults(results) {
+            resultsGrid.innerHTML = '';
+
+            results.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'result-card';
+                card.innerHTML = `
+                <div class="card-header">
+                    <span class="method-icon">${item.icon}</span>
+                    <div>
+                        <div class="method-name">${item.name}</div>
+                        <div class="method-desc">${item.description}</div>
+                    </div>
+                </div>
+                <div class="card-image">
+                    <img src="data:image/png;base64,${item.image}" alt="${item.name}">
+                </div>
+                <div class="card-actions">
+                    <button class="btn-action btn-download" onclick="downloadImage('${item.image}', '${item.method}')">
+                        ⬇️ Tải về
+                    </button>
+                    <button class="btn-action btn-test" onclick="testImage('${item.image}', '${item.name}')">
+                        🔍 Test ngay
+                    </button>
+                </div>
+            `;
+                resultsGrid.appendChild(card);
+            });
+
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // =============================================================
+        // DOWNLOAD & TEST ACTIONS
+        // =============================================================
+
+        // Tải ảnh về
+        window.downloadImage = function (base64Data, methodName) {
+            const link = document.createElement('a');
+            link.href = 'data:image/png;base64,' + base64Data;
+            link.download = `deepfake_${methodName}_${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // Gửi ảnh fake sang trang chính để test (sử dụng sessionStorage)
+        window.testImage = function (base64Data, methodName) {
+            // Lưu ảnh fake vào sessionStorage
+            sessionStorage.setItem('testDeepfakeImage', base64Data);
+            sessionStorage.setItem('testDeepfakeName', methodName);
+
+            // Chuyển hướng về trang chủ (dashboard) để test
+            window.location.href = '/?autoTest=deepfake';
+        };
+
+    })();
+</script>
+{% endblock %}

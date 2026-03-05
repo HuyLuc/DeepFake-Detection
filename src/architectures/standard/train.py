@@ -155,7 +155,13 @@ def run_training():
             writer = csv.writer(f)
             writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc', 'learning_rate'])
     
-    # --- 1. Chuẩn bị Dữ liệu - SỬ DỤNG DEEPFAKE-SPECIFIC AUGMENTATION ---
+    # =========================================================================
+    # BƯỚC 1: CHUẨN BỊ VÀ BIẾN ĐỔI DỮ LIỆU (DATA PREPARATION & AUGMENTATION)
+    # - Augmentation là kỹ thuật làm "mờ", "xấu" hoặc "bóp méo" ảnh gốc đi một chút.
+    #   Tại sao? Để ép mô hình AI phải học những đặc điểm khó nhận biết nhất thay vì học thuộc lòng ảnh chuẩn.
+    # - Với Deepfake, chúng ta hay gặp các video bị nén trên mạng (JPEG blur), quay bằng camera mờ (Noise). 
+    #   Do đó việc giả lập các hiệu ứng này trong lúc train giúp AI "dạn dĩ" hơn khi ra thực tế.
+    # =========================================================================
     print("\n--- 🎨 Đang thiết lập Data Augmentation ---")
     
     # Import từ module augmentation mới
@@ -208,7 +214,13 @@ def run_training():
     train_dataset = DeepfakeDataset(data_dir=train_dir, transform=data_transforms['train'])
     val_dataset = DeepfakeDataset(data_dir=val_dir, transform=data_transforms['val'])
 
-    # SỬA: Kiểm tra và áp dụng Oversampling cho train dataset
+    # =========================================================================
+    # BƯỚC 1.2: CÂN BẰNG DỮ LIỆU (DATA BALANCING & OVERSAMPLING)
+    # Đôi khi số ảnh FAKE chúng ta có nhiều hơn ảnh REAL (hoặc ngược lại). 
+    # Nếu để nguyên, AI sẽ có xu hướng "đoán" lớp nào có nhiều ảnh hơn để ăn gian bề mặt.
+    # Ở đây dùng Oversampling: Sao chép/nhân bản các ảnh ở lớp bị ít hơn lên để 2 bên bằng nhau.
+    # Việc này giúp mô hình công bằng khi đánh giá Fake/Real.
+    # =========================================================================
     print("\n--- ⚖️ Đang thiết lập Data Balancing ---")
     use_oversampling = getattr(config, 'USE_OVERSAMPLING', True)
     
@@ -272,8 +284,14 @@ def run_training():
     print(f"Actual batch size: {config.BATCH_SIZE}")
     print(f"Effective batch size (with accumulation): {effective_batch_size}")
 
-    # --- 2. Xây dựng Mô hình, Optimizer, Loss ---
+    # =========================================================================
+    # BƯỚC 2: BUILD MÔ HÌNH VÀ CÁC HÀM TỐI ƯU HÓA (MODEL & OPTIMIZERS)
+    # =========================================================================
     print("\n--- Đang tính toán trọng số lớp ---")
+    
+    # Tính trọng số phạt Loss (Class Weights):
+    # Nếu hệ thống nhận diện đây là lớp ít dữ liệu (ví dụ REAL bị ít), 
+    # mà AI lỡ đoán sai, thì ta sẽ "phạt" hình phạt (Loss) nặng hơn để nó chú ý học lớp bị thiệt thòi này kỹ hơn.
     
     # Giả định các lớp được sắp xếp theo thứ tự alphabet: ['FAKE', 'REAL']
     # Cần đảm bảo thứ tự này khớp với train_dataset.classes
@@ -367,19 +385,27 @@ def run_training():
     early_stopping_counter = 0
     print(f"Early stopping patience: {early_stopping_patience} epochs (đã điều chỉnh để tránh overfitting nghiêm trọng)")
 
-    # --- 4. Vòng lặp Huấn luyện và Kiểm định ---
+    # =========================================================================
+    # BƯỚC 4: VÒNG LẶP HUẤN LUYỆN (EPOCHS LOOP)
+    # Epoch: Là một lần AI phân tích qua TOÀN BỘ dữ liệu (cả nghìn file ảnh) có trong máy.
+    # Quá trình chuẩn 1 Vòng: Train (Học và sửa lỗi) -> Validation (Làm bài kiểm tra xem có học vẹt không) -> Checkpoint (Lưu nếu kết quả tốt).
+    # =========================================================================
     print("\n--- Bắt đầu vòng lặp huấn luyện ---")
     for epoch in range(start_epoch, config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{config.NUM_EPOCHS}")
         print("-" * 20)
 
-        # THÊM: Aggressive memory cleanup chỉ khi cần (mỗi 2 epochs)
+        # Giải phóng memory GPU chỉ khi cần thiết để tránh tràn RAM
         if epoch % 2 == 0:  # Mỗi 2 epochs thay vì mỗi epoch
             if config.DEVICE == 'cuda':
                 torch.cuda.empty_cache()
             gc.collect()
 
-        # Giai đoạn Huấn luyện với Mixed Precision và Progress Bar chi tiết
+        # ---------------------------------------------------------------------
+        # PHASE 1: TRAINING - HỌC VÀ CẬP NHẬT TRỌNG SỐ CHO AI
+        # Lệnh model.train() bật chế độ cho AI tính Gradient (đạo hàm đường dốc).
+        # Nói đơn giản là: "Tôi đang cho xem đáp án để học và tự sửa não bộ (Weights)".
+        # ---------------------------------------------------------------------
         model.train()
         running_loss, running_corrects = 0.0, 0
         
@@ -443,7 +469,12 @@ def run_training():
         print(f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f}")
         logger.info(f"Epoch {epoch+1} - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
-        # Giai đoạn Kiểm định với tối ưu
+        # ---------------------------------------------------------------------
+        # PHASE 2: VALIDATION - KIỂM TRA KHÔNG ĐƯỢC XEM LỜI GIẢI
+        # Bật model.eval() và khóa việc đánh giá Gradient bằng (torch.no_grad()).
+        # AI lúc này chỉ nhận dữ liệu lạ và phán đoán, KHÔNG CÓ CƠ CHẾ SỬA SAI TRONG NÃO NỮA. 
+        # Đánh giá đúng năng lực thực sự, tránh hiện tượng Model "học vẹt".
+        # ---------------------------------------------------------------------
         model.eval()
         val_loss, val_corrects = 0.0, 0
 
@@ -481,7 +512,11 @@ def run_training():
             writer = csv.writer(f)
             writer.writerow([epoch, f"{train_loss:.4f}", f"{train_acc:.4f}", f"{val_loss:.4f}", f"{val_acc:.4f}", f"{current_lr}"])
 
-        # Lưu Checkpoint và Early Stopping
+        # ---------------------------------------------------------------------
+        # PHASE 3: TÌM CHECKPOINT TỐT NHẤT VÀ DỪNG SỚM (EARLY STOPPING)
+        # Checkpoint: Nếu AI ở vòng này (val_acc) thông minh hơn tất cả các vòng trước đó -> Lưu ngay file weight lại!
+        # Early Stopping: Nếu AI làm bài thi tệ đi liên tục 2-3 vòng (patience counter tăng) -> Cắt dừng cuộc train ngay vì nó đang học vẹt!
+        # ---------------------------------------------------------------------
         is_best = val_acc > best_val_acc
         if is_best:
             best_val_acc = val_acc

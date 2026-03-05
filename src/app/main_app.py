@@ -27,6 +27,7 @@ from src.app.api.routes import api
 from src.app.api.export_routes import export_api
 from src.app.api.news_routes import news_bp
 from src.app.api.chat_routes import chat_bp
+from src.app.api.deepfake_gen_routes import deepfake_gen_bp
 
 # =============================================================================
 # LOGGING SETUP
@@ -115,6 +116,7 @@ def create_app(config=None):
     app.register_blueprint(export_api)
     app.register_blueprint(news_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(deepfake_gen_bp)
     
     logger.info("✅ Registered API blueprints")
     
@@ -141,6 +143,11 @@ def create_app(config=None):
     def news():
         """News page"""
         return render_template('news.html')
+
+    @app.route('/deepfake-generator')
+    def deepfake_generator():
+        """Deepfake Generator Demo page"""
+        return render_template('deepfake_generator.html')
     
     # ==========================================================================
     # ERROR HANDLERS

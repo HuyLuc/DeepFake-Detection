@@ -42,7 +42,7 @@ MANIPULATION_DIRS = {
 # --- 2. CẤU HÌNH TIỀN XỬ LÝ (PREPROCESSING CONFIGURATION) ---
 # ==============================================================================
 COMPRESSION_LEVEL = 'c23'
-NUM_FRAMES_PER_VIDEO = 20  # 🆙 TĂNG từ 10 → 20 frames/video để model học nhiều temporal patterns hơn
+NUM_FRAMES_PER_VIDEO = 20  #  20 frames/video để model học nhiều temporal patterns hơn
 RANDOM_SEED = 42
 TRAIN_SPLIT = 0.8
 VAL_SPLIT = 0.1
