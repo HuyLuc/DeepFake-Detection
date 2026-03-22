@@ -179,8 +179,8 @@ class TestModelManager:
         """Test 12: Image preprocessing"""
         tensor = manager._prepare_image(dummy_image)
         
-        # Check shape: (1, 3, 224, 224)
-        assert tensor.shape == (1, 3, 224, 224)
+        # Check shape: (1, 3, 380, 380)
+        assert tensor.shape == (1, 3, 380, 380)
         assert tensor.device == manager.device
         
         print(f"✅ Test 12 passed: Image preprocessing, shape = {tensor.shape}")
@@ -191,8 +191,8 @@ class TestModelManager:
         sequence = dummy_images[:5]
         tensor = manager._prepare_sequence(sequence)
         
-        # Check shape: (1, 5, 3, 224, 224)
-        assert tensor.shape == (1, 5, 3, 224, 224)
+        # Check shape: (1, 5, 3, 380, 380)
+        assert tensor.shape == (1, 5, 3, 380, 380)
         assert tensor.device == manager.device
         
         print(f"✅ Test 13 passed: Sequence preprocessing, shape = {tensor.shape}")

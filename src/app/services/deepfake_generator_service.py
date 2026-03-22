@@ -234,8 +234,9 @@ class DeepfakeGeneratorService:
         """
         Mô phỏng hiệu ứng DeepFakes:
         - Smooth/blur mạnh vùng mặt (giống lỗi autoencoder mất chi tiết)
-        - Thay đổi tone màu da (color shift nhẹ) 
+        - Thay đổi tone màu da (color shift mạnh) 
         - Blend viền mặt không tự nhiên (boundary artifact)
+        - Compression artifacts (JPEG noise kép)
         """
         x, y, w, h = face_rect
         result = img.copy()
@@ -244,15 +245,15 @@ class DeepfakeGeneratorService:
         face_roi = result[y:y+h, x:x+w].copy()
         
         # BƯỚC 1: Blur mạnh vùng mặt (mô phỏng autoencoder mất chi tiết lỗ chân lông)
-        # Dùng bilateral filter để giữ viền nhưng mịn bề mặt (giống decoder output)
-        face_blurred = cv2.bilateralFilter(face_roi, 15, 80, 80)
-        face_blurred = cv2.GaussianBlur(face_blurred, (7, 7), 3)
+        # Dùng bilateral filter mạnh + Gaussian blur lớn để mô phỏng decoder output
+        face_blurred = cv2.bilateralFilter(face_roi, 21, 120, 120)
+        face_blurred = cv2.GaussianBlur(face_blurred, (11, 11), 5)
         
-        # BƯỚC 2: Color shift - Dịch chuyển tone màu da (mô phỏng khác biệt ánh sáng khi decode)
+        # BƯỚC 2: Color shift mạnh (mô phỏng khác biệt ánh sáng khi decode)
         hsv = cv2.cvtColor(face_blurred, cv2.COLOR_BGR2HSV).astype(np.float32)
-        hsv[:, :, 0] = (hsv[:, :, 0] + 8) % 180  # Dịch Hue nhẹ
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.15, 0, 255)  # Tăng Saturation
-        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 0.95, 0, 255)  # Giảm Brightness nhẹ
+        hsv[:, :, 0] = (hsv[:, :, 0] + 15) % 180  # Dịch Hue rõ rệt
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.30, 0, 255)  # Tăng Saturation mạnh
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 0.90, 0, 255)  # Giảm Brightness
         face_colored = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
         
         # BƯỚC 3: Tạo mask elip cho vùng mặt (blend không hoàn hảo = artifact)
@@ -269,10 +270,11 @@ class DeepfakeGeneratorService:
         blended_face = (face_colored * mask_3ch + face_roi * (1 - mask_3ch)).astype(np.uint8)
         result[y:y+h, x:x+w] = blended_face
         
-        # BƯỚC 5: Thêm compression artifact nhẹ (JPEG noise)
-        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 65]
-        _, encoded = cv2.imencode('.jpg', result, encode_param)
-        result = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+        # BƯỚC 5: Compression artifacts kép (JPEG noise mạnh)
+        # Lần 1: nén quality thấp
+        result = self._apply_jpeg_compression(result, quality=40)
+        # Lần 2: nén lại để tạo double-compression artifact đặc trưng deepfake
+        result = self._apply_jpeg_compression(result, quality=55)
         
         return result
     
@@ -282,16 +284,20 @@ class DeepfakeGeneratorService:
     def _apply_face2face(self, img, face_rect, landmarks):
         """
         Mô phỏng hiệu ứng Face2Face:
-        - Warp biến dạng nhẹ vùng miệng (mô phỏng reenactment biểu cảm)
-        - Thêm noise texture vào vùng mắt/miệng
-        - Thay đổi contrast cục bộ (lighting inconsistency)
+        - Warp biến dạng mạnh vùng miệng (mô phỏng reenactment biểu cảm)
+        - Thêm noise texture mạnh vào vùng mắt/miệng
+        - Thay đổi contrast cục bộ rõ rệt (lighting inconsistency)
         """
         x, y, w, h = face_rect
         result = img.copy()
         
         face_roi = result[y:y+h, x:x+w].copy()
         
-        # BƯỚC 1: Biến dạng nhẹ vùng miệng bằng phép biến đổi affine
+        # BƯỚC 0: Bilateral blur mạnh (mô phỏng autoencoder smoothing đặc trưng deepfake)
+        face_roi = cv2.bilateralFilter(face_roi, 19, 100, 100)
+        face_roi = cv2.GaussianBlur(face_roi, (9, 9), 4)
+        
+        # BƯỚC 1: Biến dạng vùng miệng bằng phép biến đổi affine
         # Chia vùng mặt thành phần trên và dưới. Phần dưới (miệng) bị warp nhiều hơn.
         mouth_y_start = int(h * 0.55)  # Vùng miệng bắt đầu từ 55% chiều cao mặt
         mouth_region = face_roi[mouth_y_start:, :].copy()
@@ -305,9 +311,9 @@ class DeepfakeGeneratorService:
             
             for iy in range(mh):
                 for ix in range(mw):
-                    # Displacement: miệng bị kéo xuống + sang ngang nhẹ
-                    offset_x = 3 * np.sin(2 * np.pi * iy / mh)
-                    offset_y = 2 * np.sin(2 * np.pi * ix / mw)
+                    # Displacement mạnh hơn: miệng bị kéo xuống + sang ngang rõ rệt
+                    offset_x = 6 * np.sin(2 * np.pi * iy / mh)
+                    offset_y = 4 * np.sin(2 * np.pi * ix / mw)
                     map_x[iy, ix] = ix + offset_x
                     map_y[iy, ix] = iy + offset_y
             
@@ -315,16 +321,16 @@ class DeepfakeGeneratorService:
                                       borderMode=cv2.BORDER_REFLECT)
             face_roi[mouth_y_start:, :] = warped_mouth
         
-        # BƯỚC 2: Thêm noise texture vào vùng mắt (mô phỏng rendering imperfection)
+        # BƯỚC 2: Thêm noise texture mạnh vào vùng mắt (rendering imperfection rõ rệt)
         eye_y_end = int(h * 0.45)
         eye_region = face_roi[:eye_y_end, :].copy()
-        noise = np.random.normal(0, 8, eye_region.shape).astype(np.float32)
+        noise = np.random.normal(0, 20, eye_region.shape).astype(np.float32)
         eye_noisy = np.clip(eye_region.astype(np.float32) + noise, 0, 255).astype(np.uint8)
         face_roi[:eye_y_end, :] = eye_noisy
         
-        # BƯỚC 3: Thay đổi contrast cục bộ (lighting không khớp khi transfer expression)
+        # BƯỚC 3: Thay đổi contrast cục bộ mạnh (lighting không khớp rõ rệt)
         lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB).astype(np.float32)
-        lab[:, :, 0] = np.clip(lab[:, :, 0] * 1.08 + 5, 0, 255)  # Tăng L (luminance)
+        lab[:, :, 0] = np.clip(lab[:, :, 0] * 1.15 + 10, 0, 255)  # Tăng L (luminance) mạnh
         face_roi = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_LAB2BGR)
         
         # BƯỚC 4: Blend mặt đã biến dạng quay lại ảnh gốc
@@ -337,6 +343,10 @@ class DeepfakeGeneratorService:
         blended = (face_roi * mask_3ch + original_face * (1 - mask_3ch)).astype(np.uint8)
         result[y:y+h, x:x+w] = blended
         
+        # BƯỚC 5: Compression artifacts kép (giống DeepFakes)
+        result = self._apply_jpeg_compression(result, quality=40)
+        result = self._apply_jpeg_compression(result, quality=55)
+        
         return result
     
     # =========================================================================
@@ -346,17 +356,21 @@ class DeepfakeGeneratorService:
         """
         Mô phỏng hiệu ứng FaceSwap:
         - Lật ngang vùng mặt (simulate đổi mặt từ người khác)
-        - Thay đổi kích thước/scale nhẹ (geometric mismatch)
+        - Thay đổi kích thước/scale (geometric mismatch)
         - Blend viền cứng rõ ràng (hard edge boundary)
-        - Color mismatch giữa vùng mặt và cổ/tóc
+        - Color mismatch mạnh giữa vùng mặt và cổ/tóc
         """
         x, y, w, h = face_rect
         result = img.copy()
         
         face_roi = result[y:y+h, x:x+w].copy()
         
+        # BƯỚC 0: Bilateral blur mạnh (mô phỏng autoencoder smoothing)
+        face_roi_blurred = cv2.bilateralFilter(face_roi, 19, 100, 100)
+        face_roi_blurred = cv2.GaussianBlur(face_roi_blurred, (9, 9), 4)
+        
         # BƯỚC 1: Lật ngang khuôn mặt (mô phỏng việc lấy mặt người khác dán vào)
-        face_flipped = cv2.flip(face_roi, 1)
+        face_flipped = cv2.flip(face_roi_blurred, 1)
         
         # BƯỚC 2: Scale nhẹ (geometric mismatch - mặt bị to/nhỏ so với khung đầu)
         scale_factor = 0.93
@@ -370,11 +384,11 @@ class DeepfakeGeneratorService:
         face_padded = face_roi.copy()
         face_padded[pad_y:pad_y+new_h, pad_x:pad_x+new_w] = face_scaled
         
-        # BƯỚC 3: Color mismatch (mặt swap thường khác tone so với da cổ/tai)
+        # BƯỚC 3: Color mismatch mạnh (mặt swap khác tone rõ rệt so với da cổ/tai)
         hsv = cv2.cvtColor(face_padded, cv2.COLOR_BGR2HSV).astype(np.float32)
-        hsv[:, :, 0] = (hsv[:, :, 0] - 6) % 180   # Dịch hue ngược lại
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 0.85, 0, 255)  # Giảm saturation
-        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 1.08, 0, 255)  # Tăng brightness
+        hsv[:, :, 0] = (hsv[:, :, 0] - 12) % 180   # Dịch hue mạnh
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 0.70, 0, 255)  # Giảm saturation mạnh
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 1.15, 0, 255)  # Tăng brightness rõ
         face_colored = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
         
         # BƯỚC 4: Tạo mask CỨNG (hard edge) - đặc trưng FaceSwap
@@ -389,6 +403,10 @@ class DeepfakeGeneratorService:
         blended = (face_colored * mask_3ch + original_face * (1 - mask_3ch)).astype(np.uint8)
         result[y:y+h, x:x+w] = blended
         
+        # BƯỚC 6: Compression artifacts kép (giống DeepFakes)
+        result = self._apply_jpeg_compression(result, quality=40)
+        result = self._apply_jpeg_compression(result, quality=55)
+        
         return result
     
     # =========================================================================
@@ -397,44 +415,52 @@ class DeepfakeGeneratorService:
     def _apply_neuraltextures(self, img, face_rect, landmarks):
         """
         Mô phỏng hiệu ứng NeuralTextures:
-        - Thêm texture pattern lạ trên bề mặt da (neural rendering imperfections)
-        - Color jitter vùng mặt (rendering color inconsistency)
-        - Frequency noise (high-frequency artifacts từ neural network output)
-        - Giữ nguyên hình dạng (không warp) nhưng thay đổi kết cấu bề mặt
+        - Thêm texture pattern mạnh trên bề mặt da (neural rendering imperfections)
+        - Color jitter mạnh vùng mặt (rendering color inconsistency)
+        - Frequency noise mạnh (high-frequency artifacts từ neural network output)
+        - Giữ nguyên hình dạng (không warp) nhưng thay đổi kết cấu bề mặt rõ rệt
         """
         x, y, w, h = face_rect
         result = img.copy()
         
         face_roi = result[y:y+h, x:x+w].copy()
         
+        # BƯỚC 0: Bilateral blur MẠNH (mô phỏng neural rendering smoothing)
+        # Blur mạnh trước, rồi thêm texture lên trên — giữ được signature smoothing
+        face_roi = cv2.bilateralFilter(face_roi, 21, 120, 120)
+        face_roi = cv2.GaussianBlur(face_roi, (11, 11), 5)
+        
         # BƯỚC 1: Tạo texture pattern (mô phỏng neural rendering output)
-        # Dùng Perlin-like noise bằng cách cộng nhiều layer GaussianBlur khác nhau
-        noise_fine = np.random.normal(0, 12, face_roi.shape).astype(np.float32)
+        # Giảm noise amplitude để không counteract blur quá mạnh
+        noise_fine = np.random.normal(0, 15, face_roi.shape).astype(np.float32)
         noise_coarse = cv2.GaussianBlur(
-            np.random.normal(0, 20, face_roi.shape).astype(np.float32), 
+            np.random.normal(0, 25, face_roi.shape).astype(np.float32), 
             (15, 15), 5
         )
-        texture_noise = noise_fine * 0.6 + noise_coarse * 0.4
+        texture_noise = noise_fine * 0.5 + noise_coarse * 0.5
         
         face_textured = np.clip(face_roi.astype(np.float32) + texture_noise, 0, 255).astype(np.uint8)
         
-        # BƯỚC 2: Color jitter (neural renderer không duy trì được chính xác tone màu)
-        # Thay đổi từng kênh màu một cách độc lập
-        b, g, r = cv2.split(face_textured)
-        b = np.clip(b.astype(np.float32) * 1.05 + 3, 0, 255).astype(np.uint8)
-        g = np.clip(g.astype(np.float32) * 0.97 - 2, 0, 255).astype(np.uint8)
-        r = np.clip(r.astype(np.float32) * 1.02 + 1, 0, 255).astype(np.uint8)
-        face_jittered = cv2.merge([b, g, r])
+        # BƯỚC 2: Color jitter mạnh (neural renderer không duy trì được chính xác tone màu)
+        # Dịch Hue tương tự DeepFakes để model nhận ra
+        hsv = cv2.cvtColor(face_textured, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 0] = (hsv[:, :, 0] + 12) % 180  # Dịch Hue
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.20, 0, 255)  # Tăng Saturation
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 0.92, 0, 255)  # Giảm Brightness
+        face_jittered = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
         
-        # BƯỚC 3: High-frequency sharpening artifact (neural net hay tạo ringing effect)
+        # BƯỚC 3: Giữ lại chút sharpening nhẹ (neural net ringing effect)
         kernel_sharpen = np.array([[-1, -1, -1],
-                                    [-1,  9.5, -1],
+                                    [-1,  10.0, -1],
                                     [-1, -1, -1]]) / 1.5
         face_sharpened = cv2.filter2D(face_jittered, -1, kernel_sharpen)
         face_sharpened = np.clip(face_sharpened, 0, 255).astype(np.uint8)
         
-        # Blend sharp và textured
-        face_final = cv2.addWeighted(face_jittered, 0.6, face_sharpened, 0.4, 0)
+        # Blend: giữ tỷ lệ nhiều phần blurred hơn
+        face_final = cv2.addWeighted(face_jittered, 0.65, face_sharpened, 0.35, 0)
+        
+        # BƯỚC 3.5: Smoothing lại sau khi blend (giữ signature blur cho model nhận diện)
+        face_final = cv2.GaussianBlur(face_final, (5, 5), 2)
         
         # BƯỚC 4: Tạo mask hình elip cho blend mịn
         mask = np.zeros((h, w), dtype=np.uint8)
@@ -447,11 +473,31 @@ class DeepfakeGeneratorService:
         blended = (face_final * mask_3ch + original_face * (1 - mask_3ch)).astype(np.uint8)
         result[y:y+h, x:x+w] = blended
         
+        # BƯỚC 6: Compression artifacts kép (giống DeepFakes)
+        result = self._apply_jpeg_compression(result, quality=38)
+        result = self._apply_jpeg_compression(result, quality=55)
+        
         return result
     
     # =========================================================================
     # TIỆN ÍCH
     # =========================================================================
+    def _apply_jpeg_compression(self, img, quality=50):
+        """
+        Áp dụng JPEG compression để tạo compression artifacts.
+        Giúp mô phỏng hiệu ứng nén đặc trưng trong ảnh deepfake.
+        
+        Args:
+            img: numpy array (BGR)
+            quality: JPEG quality (0-100, thấp = nhiều artifact hơn)
+        
+        Returns:
+            numpy array đã qua compression
+        """
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        _, encoded = cv2.imencode('.jpg', img, encode_param)
+        return cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+    
     def _encode_base64(self, img):
         """Chuyển đổi ảnh OpenCV (numpy array) sang chuỗi base64 (PNG)."""
         _, buffer = cv2.imencode('.png', img)

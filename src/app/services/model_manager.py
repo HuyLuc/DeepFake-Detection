@@ -133,8 +133,10 @@ class ModelManager:
         self.advanced_model = None
         
         # Transforms
+        # QUAN TRỌNG: Phải khớp với IMAGE_SIZE khi training (380x380)
+        # Nếu dùng sai kích thước, model output sẽ hoàn toàn vô nghĩa
         self.image_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((380, 380)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
@@ -224,7 +226,7 @@ class ModelManager:
             image: PIL Image
         
         Returns:
-            Tensor of shape (1, 3, 224, 224)
+            Tensor of shape (1, 3, 380, 380)
         """
         return self.image_transform(image).unsqueeze(0).to(self.device)
     
@@ -236,7 +238,7 @@ class ModelManager:
             images: List of PIL Images (length = sequence_length)
         
         Returns:
-            Tensor of shape (1, sequence_length, 3, 224, 224)
+            Tensor of shape (1, sequence_length, 3, 380, 380)
         """
         tensors = [self.image_transform(img) for img in images]
         sequence = torch.stack(tensors).unsqueeze(0).to(self.device)  # (1, seq_len, 3, H, W)
